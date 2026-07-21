@@ -1,0 +1,205 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  password      String?
+  role          String    @default("customer")
+  phone         String?
+  avatar        String?
+  image         String?
+  emailVerified DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  image       String?
+  order       Int      @default(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Product {
+  id           String           @id @default(cuid())
+  name         String
+  slug         String           @unique
+  description  String
+  price        Float
+  comparePrice Float?
+  categorySlug String
+  images       String           @default("[]")
+  benefits     String           @default("[]")
+  ingredients  String           @default("")
+  howToUse     String           @default("")
+  stock        Int              @default(0)
+  featured     Boolean          @default(false)
+  newArrival   Boolean          @default(false)
+  bestSeller   Boolean          @default(false)
+  freeShipping Boolean          @default(false)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  variants     ProductVariant[]
+}
+
+model ProductVariant {
+  id           String   @id @default(cuid())
+  productId    String
+  name         String
+  sku          String?
+  price        Float
+  comparePrice Float?
+  stock        Int      @default(0)
+  weight       String?
+  active       Boolean  @default(true)
+  order        Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+model Order {
+  id              String   @id @default(cuid())
+  userId          String?
+  items           String   @default("[]")
+  subtotal        Float
+  total           Float
+  status          String   @default("pending")
+  customerName    String
+  email           String
+  phone           String?
+  address         String
+  city            String
+  state           String?
+  zipCode         String?
+  country         String   @default("United States")
+  paymentMethod   String   @default("clover")
+  paymentStatus   String   @default("pending")
+  cloverCheckoutId String?
+  cloverSessionId  String?
+  cloverPaymentId  String?
+  paymentDetails  String?   @default("{}")
+  invoiceNumber   String?
+  invoiceSent     Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model NewsletterSubscriber {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
+}
+
+model PromoBanner {
+  id        String   @id @default(cuid())
+  title     String
+  subtitle  String?
+  image     String?
+  ctaText   String?
+  ctaLink   String?
+  active    Boolean  @default(true)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AuthSlide {
+  id        String   @id @default(cuid())
+  title     String
+  subtitle  String?
+  mediaUrl  String
+  mediaType String   @default("image")
+  active    Boolean  @default(true)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model HeroSlide {
+  id          String   @id @default(cuid())
+  title       String   @default("")
+  subtitle    String?
+  mediaUrl    String
+  mediaType   String   @default("image")
+  active      Boolean  @default(true)
+  order       Int      @default(0)
+  overlayDark Float    @default(0.5)
+  kenBurns    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Partner {
+  id        String   @id @default(cuid())
+  name      String
+  logo      String
+  url       String?
+  active    Boolean  @default(true)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AnnouncementItem {
+  id        String   @id @default(cuid())
+  text      String
+  icon      String   @default("none")
+  separator String   @default("✦")
+  active    Boolean  @default(true)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Transformation {
+  id        String   @id @default(cuid())
+  name      String
+  duration  String
+  result    String
+  beforeImg String
+  afterImg  String
+  active    Boolean  @default(true)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model InspirationItem {
+  id        String   @id @default(cuid())
+  label     String
+  tip       String
+  image     String
+  icon      String   @default("Sparkles")
+  color     String   @default("from-gold/80")
+  active    Boolean  @default(true)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── Key-Value Settings Store (persists across sandbox resets) ───────────────
+// Used as a DB-backed fallback for environment variables (especially Clover
+// payment credentials) so that when the sandbox wipes .env.local, the app
+// can still read credentials from the SQLite database (which persists).
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}

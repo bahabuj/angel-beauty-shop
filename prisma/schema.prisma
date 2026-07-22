@@ -198,7 +198,7 @@ model InspirationItem {
 // ─── Key-Value Settings Store (persists across sandbox resets) ───────────────
 // Used as a DB-backed fallback for environment variables (especially Clover
 // payment credentials) so that when the sandbox wipes .env.local, the app
-// can still read credentials from the SQLite database (which persists).
+// can still read credentials from the PostgreSQL database (which persists).
 model Setting {
   key       String   @id
   value     String

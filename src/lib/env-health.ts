@@ -41,7 +41,7 @@ export const ENV_VARS: readonly EnvVarSpec[] = [
   {
     key: 'DATABASE_URL',
     category: 'required',
-    description: 'SQLite connection string. Prisma throws at runtime if missing.',
+    description: 'Supabase pooler connection string (port 6543, pgbouncer=true). Used at runtime by the app.',
     standalone: true,
   },
   {

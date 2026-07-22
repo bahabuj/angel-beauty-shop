@@ -3,7 +3,7 @@
 // PURPOSE: Provide a persistent fallback for environment variables so that
 // when the sandbox wipes `.env.local` (which happens periodically), the app
 // can still read critical credentials (like Clover payment tokens) from the
-// SQLite database — which DOES persist across sandbox resets.
+// PostgreSQL database (Supabase) — persists across serverless cold starts.
 //
 // ARCHITECTURE:
 //   - `getAllSettings()`  — async, reads ALL rows from the Setting table

@@ -1,6 +1,6 @@
 # Angelsbeauty — Premium Skincare E-Commerce
 
-A production-ready Next.js 16 e-commerce application for Angelsbeauty, a premium skincare brand. Features server-side rendering for instant page loads, Clover Hosted Checkout for secure payments, a full admin dashboard, SEO infrastructure, and a mobile-first responsive design.
+A production-ready Next.js 16 e-commerce application for Angelsbeauty, a premium skincare brand. Features server-side rendering for instant page loads, **Supabase PostgreSQL** for managed database storage, **Cloudinary** for image/video CDN delivery, **Clover Hosted Checkout** for secure payments, a full admin dashboard with real-time stats, SEO infrastructure, and a mobile-first responsive design. Deployed on **Vercel**.
 
 ---
 
@@ -30,14 +30,16 @@ A production-ready Next.js 16 e-commerce application for Angelsbeauty, a premium
 | Framework | Next.js 16 (App Router, Turbopack dev, Webpack build) |
 | Language | TypeScript 5 (strict) |
 | Styling | Tailwind CSS 4 + shadcn/ui (New York) |
-| Database | Prisma ORM + SQLite |
+| Database | **Supabase PostgreSQL** + Prisma ORM (connection pooling via PgBouncer) |
+| Image/Video Storage | **Cloudinary** (CDN-backed uploads, secure URLs stored in PostgreSQL) |
 | Auth | NextAuth.js v4 (credentials + Firebase) + bcrypt |
-| Payments | Clover Ecommerce Hosted Checkout |
+| Payments | **Clover Ecommerce Hosted Checkout** |
 | State | Zustand (client) + TanStack-style fetch (server) |
 | Animations | Framer Motion |
 | Icons | Lucide React |
 | PDF | PDFKit + jsPDF |
-| Runtime | Bun |
+| Runtime | Bun (dev) / Node.js (Vercel serverless) |
+| Deployment | **Vercel** |
 
 ---
 
@@ -132,12 +134,21 @@ The app starts on http://localhost:3000. The dev script uses `--webpack` flag fo
 
 ### Initialize the database
 
+The project uses **Supabase PostgreSQL**. Set `DATABASE_URL` (pooler, port 6543) and `DIRECT_URL` (direct, port 5432) in `.env.local`, then:
+
 ```bash
-bun run db:push     # Push schema to SQLite
-bun run db:generate # Regenerate Prisma client
+bun run db:generate   # Regenerate Prisma client for PostgreSQL
+bun run db:push       # Push schema to Supabase (creates all 14 tables + indexes + FKs)
 ```
 
-The SQLite file is created at `db/custom.db` (path configured in `.env`).
+For production deployments, use Prisma migrations instead:
+
+```bash
+bun run db:migrate:prod   # prisma migrate deploy (runs pending migrations)
+```
+
+The schema is defined in `prisma/schema.prisma` with `provider = "postgresql"`.
+See the [Database](#database) section below for full details.
 
 ### Generate icons (first time only)
 
@@ -175,8 +186,12 @@ Or configure Clover via the admin UI: **Admin → Settings → Clover Payment Co
 
 | Variable | Description |
 |----------|-------------|
-| `DATABASE_URL` | SQLite connection string. Prisma throws at runtime if missing. Example: `file:./db/custom.db` |
+| `DATABASE_URL` | **Supabase pooler** connection string (port 6543, pgbouncer=true). Used at runtime by the app. Format: `postgresql://USER:PASSWORD@HOST.pooler.supabase.com:6543/postgres?pgbouncer=true&prepared_statement_cache_size=0` |
+| `DIRECT_URL` | **Supabase direct** connection (port 5432). Used by Prisma for migrations ONLY. Format: `postgresql://USER:PASSWORD@HOST.supabase.co:5432/postgres` |
 | `NEXTAUTH_SECRET` | Signs NextAuth session JWTs + cookie auth tokens. Generate with `openssl rand -base64 32`. Rotating invalidates all sessions. |
+| `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name (public — safe for browser bundle). |
+| `CLOUDINARY_API_KEY` | Cloudinary API key (server-only). |
+| `CLOUDINARY_API_SECRET` | Cloudinary API secret (server-only — NEVER expose to client). |
 
 #### REQUIRED FOR PAYMENTS — app runs but checkout fails without these
 
@@ -265,24 +280,39 @@ The `.env.local` writer (`src/lib/env-file.ts`) **never overwrites or deletes** 
 
 ## Database
 
+### Provider
+
+This project uses **Supabase PostgreSQL** as its database. The `prisma/schema.prisma` is configured with `provider = "postgresql"` and uses two connection strings:
+
+- **`DATABASE_URL`** — Supabase pooler (PgBouncer, port 6543) — used at runtime by the app
+- **`DIRECT_URL`** — Supabase direct connection (port 5432) — used by Prisma for migrations
+
+This dual-URL setup is required because PgBouncer (transaction mode) doesn't support all of Prisma's migration commands, so migrations use the direct connection while runtime queries use the pooler for connection reuse.
+
 ### Schema
 
-The Prisma schema (`prisma/schema.prisma`) defines these models:
+The Prisma schema (`prisma/schema.prisma`) defines 14 models:
 
 - **User** — id, email, name, password (bcrypt), role (`customer` | `admin`), phone, avatar
 - **Category** — name, slug, description, image, order, active
 - **Product** — name, slug, description, price, comparePrice, categorySlug, images (JSON), benefits (JSON), ingredients, howToUse, stock, featured, newArrival, bestSeller, freeShipping
+- **ProductVariant** — productId (FK → Product, cascade delete), name, sku, price, stock, weight, active
 - **Order** — items (JSON), subtotal, total, status, customerName, email, phone, address, paymentMethod, paymentStatus, cloverCheckoutId, cloverPaymentId, paymentDetails (JSON), invoiceNumber, invoiceSent
 - **HeroSlide, PromoBanner, Partner, Transformation, InspirationItem, AnnouncementItem, AuthSlide** — visual content models
 - **NewsletterSubscriber** — email, createdAt
+- **Setting** — key/value store for Clover credentials and other persistent config
+
+All tables use `createdAt` / `updatedAt` timestamps, primary keys (cuid), foreign keys with explicit cascade rules, and indexes on frequently queried columns (slug, email, status, createdAt, etc.).
 
 ### Commands
 
 ```bash
-bun run db:push      # Apply schema changes to SQLite (no migration history)
-bun run db:generate  # Regenerate Prisma client after schema changes
-bun run db:migrate   # Create + apply a migration (development only)
-bun run db:reset     # Drop + recreate the database (DESTRUCTIVE)
+bun run db:generate       # Regenerate Prisma client after schema changes
+bun run db:push           # Push schema to Supabase (creates/updates tables — dev only)
+bun run db:migrate        # Create + apply a migration (development only)
+bun run db:migrate:prod   # Apply pending migrations in production (prisma migrate deploy)
+bun run db:reset          # Drop + recreate the database (DESTRUCTIVE — dev only)
+bun run db:resolve:applied # Mark a migration as already applied (used after manual SQL apply)
 ```
 
 ---
@@ -391,26 +421,50 @@ const { db } = require('./src/lib/db');
 
 ## Deployment
 
-### Production build
+### Vercel (recommended)
+
+This project is configured for **Vercel** deployment. The `package.json` includes a `vercel-build` script that runs `prisma generate` + `prisma migrate deploy` + `next build` in sequence.
+
+1. Push the repo to GitHub
+2. Go to [vercel.com](https://vercel.com) → **New Project** → import the repository
+3. Vercel auto-detects Next.js — accept the defaults
+4. Set the **Build Command** to `bun run vercel-build`
+5. Set all environment variables (see [Environment Variables](#environment-variables)) in the Vercel dashboard
+6. Deploy
+
+Required environment variables for Vercel:
+
+- `DATABASE_URL` (Supabase pooler, port 6543)
+- `DIRECT_URL` (Supabase direct, port 5432)
+- `NEXTAUTH_SECRET`
+- `NEXTAUTH_URL` (your Vercel domain, e.g. `https://your-app.vercel.app`)
+- `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
+- `CLOVER_ECOM_TOKEN`, `CLOVER_ECOM_MERCHANT_ID`, `CLOVER_ENVIRONMENT`, `CLOVER_DEBUG`
+- `NEXT_PUBLIC_SITE_URL`
+
+### Serverless compatibility
+
+- All filesystem writes are best-effort (invoice PDFs, env-file updates) — they gracefully degrade on Vercel's read-only filesystem
+- Prisma client is bundled via `outputFileTracingIncludes` in `next.config.ts`
+- Cloudinary is used for all image/video uploads (no local filesystem storage)
+- The `Setting` table in PostgreSQL provides a serverless-friendly fallback for storing credentials that need to survive cold starts
+
+### Local production build
 
 ```bash
-bun run build    # Builds + copies static + public to .next/standalone
-bun run start    # Starts production server (NODE_ENV=production)
+bun run build    # next build (also runs prisma generate via postinstall)
+bun run start    # Starts production server on port 3000
 ```
 
-The build uses Webpack (not Turbopack) for production stability. The `next.config.ts` enforces strict TypeScript (`typescript.ignoreBuildErrors` was removed in a hardening pass) — type errors WILL fail the build. Always run `bunx tsc --noEmit` in CI to catch type errors early.
-
-### Production checklist
-
-See [DEPLOYMENT CHECKLIST](#deployment-checklist) below.
+The build uses Webpack (not Turbopack) for production stability. The `next.config.ts` enforces strict TypeScript — type errors WILL fail the build. Always run `bunx tsc --noEmit` in CI to catch type errors early.
 
 ### Reverse proxy (Caddy)
 
-The repo includes a `Caddyfile` that proxies external HTTPS traffic to the Next.js dev server on port 3000. In production, point Caddy (or nginx) at the production server port.
+The repo includes a `Caddyfile` for local dev that proxies external HTTPS traffic to the Next.js dev server on port 3000. On Vercel, this is not needed — Vercel handles the edge/CDN layer.
 
 ### Port allocation
 
-- **3000** — Next.js (only externally-exposed port)
+- **3000** — Next.js (only externally-exposed port for self-hosted deployments)
 - **3001+** — Optional mini-services (websocket, etc.) — use `?XTransformPort=3001` in URLs to route through Caddy
 
 ---
@@ -419,38 +473,33 @@ The repo includes a `Caddyfile` that proxies external HTTPS traffic to the Next.
 
 ### Database backup
 
-The SQLite database is a single file at `db/custom.db`. Back it up with:
+The project uses **Supabase PostgreSQL**. Backups are managed by Supabase:
+
+- **Automatic daily backups** — Supabase Pro plan keeps 7 daily + 4 weekly + 12 monthly PITR (point-in-time recovery) backups
+- **Manual snapshot** — Supabase Dashboard → Database → Backups → Create backup
+- **Logical export** — Use `pg_dump` with the direct connection string:
 
 ```bash
-# Daily backup (cron)
-cp /home/z/my-project/db/custom.db /backups/custom-$(date +%Y%m%d).db
-
-# Or using sqlite3 for a consistent snapshot
-sqlite3 /home/z/my-project/db/custom.db ".backup /backups/custom-$(date +%Y%m%d).db"
+pg_dump "$DIRECT_URL" --format=custom --file=angelsbeauty-$(date +%Y%m%d).dump
 ```
-
-Recommended retention: 7 daily + 4 weekly + 12 monthly.
 
 ### Restore
 
-```bash
-# Stop the app
-# Replace the database file
-cp /backups/custom-20260101.db /home/z/my-project/db/custom.db
-# Restart the app
-```
+- **From Supabase backup** — Supabase Dashboard → Database → Backups → select snapshot → Restore
+- **From pg_dump file** — `pg_restore --dbname="$DIRECT_URL" --clean --if-exists angelsbeauty-YYYYMMDD.dump`
 
 ### Image uploads backup
 
-The `public/uploads/` directory contains admin-uploaded images. Back it up alongside the database:
+All admin-uploaded images and videos are stored in **Cloudinary** (not on the local filesystem). Cloudinary automatically:
+- Stores multiple format variants (original + auto-generated derivatives)
+- Provides CDN-backed delivery worldwide
+- Keeps an upload history accessible via the Cloudinary dashboard
 
-```bash
-rsync -avz /home/z/my-project/public/uploads/ /backups/uploads/
-```
+No local backup of `public/uploads/` is needed for production — Cloudinary is the source of truth.
 
 ### Environment backup
 
-`.env.local` contains all secrets. Store a copy in your secrets manager (Vault, AWS Secrets Manager, etc.). **Never commit `.env.local` to git.**
+`.env.local` contains all secrets. Store a copy in your secrets manager (Vercel project settings, Vault, AWS Secrets Manager, etc.). **Never commit `.env.local` to git.**
 
 ---
 
@@ -462,10 +511,13 @@ rsync -avz /home/z/my-project/public/uploads/ /backups/uploads/
 | `bun run build` | Production build + standalone output |
 | `bun run start` | Start production server |
 | `bun run lint` | Run ESLint |
-| `bun run db:push` | Push schema to SQLite |
+| `bun run db:push` | Push schema to Supabase PostgreSQL (creates/updates tables) |
 | `bun run db:generate` | Regenerate Prisma client |
 | `bun run db:migrate` | Create + apply migration (dev only) |
+| `bun run db:migrate:prod` | Apply pending migrations in production (prisma migrate deploy) |
 | `bun run db:reset` | Drop + recreate database (DESTRUCTIVE) |
+| `bun run db:resolve:applied` | Mark a migration as already applied |
+| `bun run vercel-build` | Vercel build command (prisma generate + migrate deploy + next build) |
 | `bun run scripts/generate-icons.ts` | Regenerate favicon, icon.png, apple-icon.png from public/images/logo.png |
 | `bun run scripts/generate-placeholder.ts` | Regenerate public/images/products/placeholder.jpg |
 
@@ -648,19 +700,23 @@ See the **Production Readiness Audit** report (final section of this README) for
 
 ### Pre-deploy
 
-- [ ] `.env.local` populated with all 13 required variables
-- [ ] `CLOVER_ENVIRONMENT=production` (not sandbox)
-- [ ] `CLOVER_DEBUG=false`
-- [ ] `NEXTAUTH_URL` and `NEXT_PUBLIC_SITE_URL` set to production domain
-- [ ] Database backed up
+- [ ] `.env.local` (or Vercel env vars) populated with all required variables:
+  - [ ] `DATABASE_URL` (Supabase pooler, port 6543, pgbouncer=true)
+  - [ ] `DIRECT_URL` (Supabase direct, port 5432)
+  - [ ] `NEXTAUTH_SECRET` (32+ random bytes)
+  - [ ] `NEXTAUTH_URL` (production domain, e.g. `https://your-domain.com`)
+  - [ ] `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
+  - [ ] `CLOVER_ECOM_TOKEN`, `CLOVER_ECOM_MERCHANT_ID`, `CLOVER_ENVIRONMENT=production`, `CLOVER_DEBUG=false`
+  - [ ] `NEXT_PUBLIC_SITE_URL` (production domain)
+- [ ] Supabase database schema applied (`bun run db:push` or `bun run db:migrate:prod`)
+- [ ] Cloudinary account configured and tested
+- [ ] Clover production credentials verified (test $1 checkout)
 - [ ] `bun run lint` passes (0 errors)
 - [ ] `bunx tsc --noEmit` passes (0 src/ errors)
-- [ ] `bun run build` succeeds
-- [ ] Admin user created with strong password
-- [ ] SSL certificate valid for production domain
-- [ ] Caddy (or nginx) configured to proxy to port 3000
-- [ ] Firewall allows only ports 80, 443
-- [ ] Backups scheduled (daily DB + weekly uploads)
+- [ ] `bun run build` succeeds (or `bun run vercel-build` for Vercel)
+- [ ] Admin user created with strong password (changed from default `admin123`)
+- [ ] Supabase project set to "Production" mode (paused-project protection disabled)
+- [ ] Cloudinary upload preset configured (optional — signed uploads used by default)
 
 ### Post-deploy
 

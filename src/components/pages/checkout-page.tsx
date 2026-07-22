@@ -18,7 +18,6 @@ export default function CheckoutPage() {
   const navigate = useNavStore((s) => s.navigate)
   const items = useCartStore((s) => s.items)
   const getSubtotal = useCartStore((s) => s.getSubtotal)
-  const clearCart = useCartStore((s) => s.clearCart)
   const hasHydrated = useCartHydrated()
   const user = useAuthStore((s) => s.user)
   const [phase, setPhase] = useState<CheckoutPhase>('info')
@@ -123,8 +122,11 @@ export default function CheckoutPage() {
       const checkoutData = await checkoutRes.json()
 
       if (checkoutData.success && checkoutData.redirectUrl) {
-        // Success: clear cart and redirect to Clover hosted checkout
-        clearCart()
+        // ─── DO NOT clear the cart here ─────────────────────────────────────
+        // The cart must stay intact until we KNOW the payment succeeded.
+        // If the customer cancels or their card is declined, they should be
+        // able to retry without losing their cart. The cart is cleared on the
+        // order-success page after Clover confirms the payment.
         toast.success('Redirecting to secure payment...')
         window.location.href = checkoutData.redirectUrl
       } else if (checkoutData.requiresConfig) {

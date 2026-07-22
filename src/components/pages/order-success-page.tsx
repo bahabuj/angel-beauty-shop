@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useNavStore } from '@/store/nav-store'
+import { useCartStore } from '@/store/cart-store'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -57,6 +58,7 @@ interface PageState {
 
 export default function OrderSuccessPage() {
   const navigate = useNavStore((s) => s.navigate)
+  const clearCart = useCartStore((s) => s.clearCart)
 
   const [orderId] = useState(() => {
     if (typeof window === 'undefined') return null
@@ -123,6 +125,16 @@ export default function OrderSuccessPage() {
       }
 
       if (order.paymentStatus === 'completed' || order.paymentStatus === 'paid') {
+        // ─── Payment confirmed — clear the cart NOW ─────────────────────────
+        // This is the ONLY place the cart should be cleared in the entire
+        // checkout flow. We wait until the order is confirmed paid before
+        // clearing, so customers who cancel or get declined can retry without
+        // losing their cart contents.
+        try {
+          clearCart()
+        } catch {
+          // Non-critical — cart clearing is best-effort
+        }
         return { phase: 'success' as Phase, order, errorMsg: '', paymentInfo }
       } else {
         return {

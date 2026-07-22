@@ -1,13 +1,14 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 import { useNavStore } from '@/store/nav-store'
 import { useCartStore } from '@/store/cart-store'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { motion } from 'framer-motion'
-import { CheckCircle2, AlertTriangle, ShoppingBag, ArrowRight, Loader2, RefreshCw, CreditCard, Shield } from 'lucide-react'
+import { CheckCircle2, AlertTriangle, ShoppingBag, ArrowRight, Loader2, RefreshCw, CreditCard, Shield, Mail, Phone, Globe } from 'lucide-react'
 
 interface OrderItem {
   id: string
@@ -277,6 +278,22 @@ export default function OrderSuccessPage() {
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.5 }}
       >
+        {/* ─── Branded Header ────────────────────────────────────────────────── */}
+        <div className="flex flex-col items-center mb-8 pb-6 border-b border-blush/30">
+          <Image
+            src="/images/logo.png"
+            alt="Angel Beauty Supply"
+            width={64}
+            height={64}
+            className="object-contain mb-3"
+            priority
+          />
+          <h2 className="text-xl font-bold" style={{ fontFamily: 'var(--font-playfair), serif' }}>
+            Angel Beauty Supply
+          </h2>
+          <p className="text-xs text-muted-foreground mt-1">Thank you for your order</p>
+        </div>
+
         <div className="text-center mb-8">
           <motion.div
             initial={{ scale: 0 }}
@@ -425,6 +442,32 @@ export default function OrderSuccessPage() {
           <Button onClick={() => navigate('account')} variant="outline" className="border-gold/30 text-gold">
             View Orders <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
+        </motion.div>
+
+        {/* ─── Business Info Footer ──────────────────────────────────────────── */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.7 }}
+          className="mt-8 pt-6 border-t border-blush/30 text-center"
+        >
+          <p className="text-sm font-semibold text-foreground mb-2">Angel Beauty Supply</p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-xs text-muted-foreground">
+            <a href="https://angelsbeauty.com" className="flex items-center gap-1.5 hover:text-gold transition-colors">
+              <Globe className="w-3 h-3" /> angelsbeauty.com
+            </a>
+            <span className="hidden sm:inline text-blush/40">•</span>
+            <a href="mailto:hello@angelbeauty.com" className="flex items-center gap-1.5 hover:text-gold transition-colors">
+              <Mail className="w-3 h-3" /> hello@angelbeauty.com
+            </a>
+            <span className="hidden sm:inline text-blush/40">•</span>
+            <a href="tel:+16179550069" className="flex items-center gap-1.5 hover:text-gold transition-colors">
+              <Phone className="w-3 h-3" /> +1 (617) 955-0069
+            </a>
+          </div>
+          <p className="text-[11px] text-muted-foreground/70 mt-3">
+            246 Union St, Lynn MA 01901, United States
+          </p>
         </motion.div>
       </motion.div>
     </div>

@@ -106,17 +106,46 @@ async function generateInvoicePDF(order: {
   doc.setFillColor(...gold)
   doc.rect(0, 0, pageWidth, 100, 'F')
 
-  // Brand name
+  // ── Logo image (top-left of gold banner) ──
+  // Embed the invoice-optimized logo PNG. jsPDF addImage supports PNG with
+  // alpha. The logo is placed at (margin, 20) with a height of 60pt — fits
+  // neatly inside the 100pt gold banner. If the image read fails (e.g. file
+  // missing in serverless), we fall back to text-only branding.
+  try {
+    const fs = await import('fs/promises')
+    const path = await import('path')
+    const logoPath = path.join(process.cwd(), 'public', 'images', 'logo-invoice.png')
+    const logoBuffer = await fs.readFile(logoPath)
+    const logoBase64 = `data:image/png;base64,${logoBuffer.toString('base64')}`
+    // Logo: 60pt tall, preserve aspect ratio (logo-invoice.png is square-ish)
+    // Place at left margin, vertically centered in the 100pt banner
+    const logoHeight = 60
+    const logoWidth = 60  // approximately square logo
+    const logoY = 20
+    doc.addImage(logoBase64, 'PNG', margin, logoY, logoWidth, logoHeight)
+  } catch (logoError) {
+    // Fallback: text-only branding if logo file can't be read
+    console.warn('[invoice] Could not load logo image, using text-only header:', logoError instanceof Error ? logoError.message : logoError)
+  }
+
+  // Brand name (positioned to the right of the logo)
   doc.setTextColor(...white)
   doc.setFontSize(26)
   doc.setFont('helvetica', 'bold')
-  doc.text('Angel Beauty', margin, 42)
+  doc.text('Angel Beauty Supply', margin + 70, 42)
 
   doc.setFontSize(10)
   doc.setFont('helvetica', 'normal')
-  doc.text('Premium Skincare', margin, 62)
+  doc.text('Premium Skincare', margin + 70, 62)
+
+  // Website URL under the tagline
+  doc.setFontSize(9)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(255, 255, 255)
+  doc.text('angelsbeauty.com', margin + 70, 78)
 
   // Invoice label on right
+  doc.setTextColor(...white)
   doc.setFontSize(14)
   doc.setFont('helvetica', 'bold')
   doc.text('INVOICE', pageWidth - margin, 35, { align: 'right' })
@@ -141,7 +170,7 @@ async function generateInvoicePDF(order: {
   doc.setTextColor(...darkText)
   doc.setFontSize(11)
   doc.setFont('helvetica', 'bold')
-  doc.text('Angel Beauty', leftCol, y)
+  doc.text('Angel Beauty Supply', leftCol, y)
   y += 14
   doc.setTextColor(...mutedText)
   doc.setFontSize(9)
@@ -153,6 +182,8 @@ async function generateInvoicePDF(order: {
   doc.text('hello@angelbeauty.com', leftCol, y)
   y += 12
   doc.text('+1 (617) 955-0069', leftCol, y)
+  y += 12
+  doc.text('angelsbeauty.com', leftCol, y)
 
   // To
   y = 120
@@ -322,14 +353,14 @@ async function generateInvoicePDF(order: {
   doc.setTextColor(...gold)
   doc.setFontSize(8)
   doc.setFont('helvetica', 'bold')
-  doc.text('THANK YOU FOR SHOPPING WITH ANGEL BEAUTY!', margin, y)
+  doc.text('THANK YOU FOR SHOPPING WITH ANGEL BEAUTY SUPPLY!', margin, y)
   y += 14
   doc.setTextColor(...mutedText)
   doc.setFontSize(7)
   doc.setFont('helvetica', 'normal')
   doc.text('If you have any questions about this invoice, please contact us at hello@angelbeauty.com or +1 (617) 955-0069', margin, y, { maxWidth: contentWidth })
   y += 11
-  doc.text('246 Union St, Lynn MA 01901, United States | hello@angelbeauty.com', margin, y, { maxWidth: contentWidth })
+  doc.text('246 Union St, Lynn MA 01901, United States | angelsbeauty.com', margin, y, { maxWidth: contentWidth })
 
   // Get PDF as buffer
   const pdfOutput = doc.output('arraybuffer')

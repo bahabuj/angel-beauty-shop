@@ -210,7 +210,19 @@ export interface HostedCheckoutRequest {
   shoppingCart: {
     lineItems: HostedCheckoutLineItem[]
   }
-  /** Optional: redirect URLs after payment (preferred over redirectUrl) */
+  /**
+   * Optional: redirect URLs after payment (preferred over redirectUrl)
+   *
+   * NOTE on merchant branding: Clover's Hosted Checkout API does NOT support
+   * custom logo or business name properties in the request body. Merchant
+   * branding (logo, business name, colors) on the Clover-hosted payment page
+   * is configured in the Clover Merchant Dashboard under:
+   *   Settings → Branding → Hosted Checkout
+   * Upload the Angel Beauty Supply logo there (recommended: 300×300px PNG
+   * with transparent background) and set the business name. The branded
+   * Hosted Checkout page will then display consistently for all sessions
+   * created via this API.
+   */
   redirectUrls?: {
     successUrl?: string
     cancelUrl?: string

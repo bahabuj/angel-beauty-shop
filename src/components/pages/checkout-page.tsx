@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import Image from 'next/image'
 import { useNavStore } from '@/store/nav-store'
 import { useCartStore, useCartHydrated } from '@/store/cart-store'
 import { useAuthStore } from '@/store/auth-store'
@@ -9,7 +10,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, ShoppingBag, Shield, Truck, Lock, Loader2, ExternalLink, AlertTriangle, Settings } from 'lucide-react'
+import { ArrowLeft, ShoppingBag, Shield, Truck, Lock, Loader2, ExternalLink, AlertTriangle, Settings, Mail, Phone, Globe } from 'lucide-react'
 import { toast } from 'sonner'
 
 type CheckoutPhase = 'info' | 'redirecting' | 'error'
@@ -252,7 +253,38 @@ export default function CheckoutPage() {
           <ArrowLeft className="w-4 h-4" /> Back to Cart
         </button>
 
-        <h1 className="text-3xl font-bold mb-6" style={{ fontFamily: 'var(--font-playfair), serif' }}>Checkout</h1>
+        {/* ─── Branded Header ────────────────────────────────────────────────── */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8 pb-6 border-b border-blush/30">
+          <div className="flex items-center gap-3">
+            <Image
+              src="/images/logo.png"
+              alt="Angel Beauty Supply"
+              width={48}
+              height={48}
+              className="object-contain"
+              priority
+            />
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold leading-tight" style={{ fontFamily: 'var(--font-playfair), serif' }}>
+                Angel Beauty Supply
+              </h1>
+              <p className="text-xs text-muted-foreground">Secure Checkout</p>
+            </div>
+          </div>
+          <div className="flex flex-col sm:items-end gap-1 text-xs text-muted-foreground">
+            <a href="https://angelsbeauty.com" className="flex items-center gap-1.5 hover:text-gold transition-colors">
+              <Globe className="w-3 h-3" /> angelsbeauty.com
+            </a>
+            <a href="mailto:hello@angelbeauty.com" className="flex items-center gap-1.5 hover:text-gold transition-colors">
+              <Mail className="w-3 h-3" /> hello@angelbeauty.com
+            </a>
+            <a href="tel:+16179550069" className="flex items-center gap-1.5 hover:text-gold transition-colors">
+              <Phone className="w-3 h-3" /> +1 (617) 955-0069
+            </a>
+          </div>
+        </div>
+
+        <h2 className="text-2xl font-bold mb-6" style={{ fontFamily: 'var(--font-playfair), serif' }}>Checkout</h2>
 
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Left: Shipping form + Clover payment section */}

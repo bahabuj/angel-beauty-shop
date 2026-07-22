@@ -14,6 +14,9 @@ const nextConfig: NextConfig = {
     // immutable Cache-Control headers on /uploads etc., repeat navigations
     // serve optimized images instantly from browser cache.
     minimumCacheTTL: 3600,
+    remotePatterns: [
+      { protocol: 'https', hostname: 'res.cloudinary.com' },
+    ],
   },
   // Long-cache immutable static assets (images, videos, uploads).
   // Files use timestamped names so they never change — browsers + CDNs can

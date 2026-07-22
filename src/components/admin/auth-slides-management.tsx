@@ -236,14 +236,15 @@ function MediaUploadDropzone({
               unoptimized
             />
           ) : (
-            <div className="flex size-full items-center justify-center bg-purple-50">
-              <div className="flex flex-col items-center gap-2">
-                <div className="flex size-14 items-center justify-center rounded-full bg-purple-100">
-                  <Video className="size-7 text-purple-600" />
-                </div>
-                <span className="text-xs text-purple-600 font-medium">Video uploaded</span>
-              </div>
-            </div>
+            <video
+              src={currentUrl.trim()}
+              muted
+              loop
+              autoPlay
+              playsInline
+              preload="metadata"
+              className="size-full object-cover"
+            />
           )}
           {/* Overlay with change/remove buttons */}
           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
@@ -583,16 +584,15 @@ export function AuthSlidesManagement({
                             unoptimized
                           />
                         ) : (
-                          <div className="flex size-full items-center justify-center bg-purple-50">
-                            <div className="flex flex-col items-center gap-2">
-                              <div className="flex size-12 items-center justify-center rounded-full bg-purple-100">
-                                <Video className="size-6 text-purple-600" />
-                              </div>
-                              <Badge className="bg-purple-100 text-purple-700 border-purple-200 hover:bg-purple-100">
-                                Video
-                              </Badge>
-                            </div>
-                          </div>
+                          <video
+                            src={slide.mediaUrl}
+                            muted
+                            loop
+                            autoPlay
+                            playsInline
+                            preload="metadata"
+                            className="size-full object-cover"
+                          />
                         )}
                       </div>
                     </div>

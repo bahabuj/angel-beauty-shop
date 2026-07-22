@@ -58,6 +58,13 @@ interface DashboardOverviewProps {
       status: string
       createdAt: string
     }>
+    revenueByMonth?: Array<{ month: string; revenue: number }>
+    changes?: {
+      products: number | null
+      orders: number | null
+      revenue: number | null
+      subscribers: number | null
+    }
   }
   products: Array<{
     id: string
@@ -69,17 +76,19 @@ interface DashboardOverviewProps {
 }
 
 // ---------------------------------------------------------------------------
-// Mock revenue data for the chart (last 6 months)
+// Revenue chart data — REAL data from /api/stats
 // ---------------------------------------------------------------------------
 
-const revenueData = [
-  { month: 'Oct', revenue: 38000 },
-  { month: 'Nov', revenue: 45000 },
-  { month: 'Dec', revenue: 52000 },
-  { month: 'Jan', revenue: 47000 },
-  { month: 'Feb', revenue: 58000 },
-  { month: 'Mar', revenue: 63000 },
-]
+function buildRevenueData(stats: DashboardOverviewProps['stats']): Array<{ month: string; revenue: number }> {
+  if (stats.revenueByMonth && stats.revenueByMonth.length > 0) return stats.revenueByMonth
+  const now = new Date()
+  const months: Array<{ month: string; revenue: number }> = []
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    months.push({ month: d.toLocaleDateString('en-US', { month: 'short' }), revenue: 0 })
+  }
+  return months
+}
 
 const revenueChartConfig: ChartConfig = {
   revenue: {
@@ -95,7 +104,7 @@ const revenueChartConfig: ChartConfig = {
 interface StatCard {
   label: string
   value: string
-  change: string
+  change: number | null
   icon: React.ElementType
   gradientFrom: string
   gradientTo: string
@@ -105,47 +114,12 @@ interface StatCard {
 
 function buildStatCards(props: DashboardOverviewProps): StatCard[] {
   const { stats } = props
+  const changes = stats.changes ?? { products: null, orders: null, revenue: null, subscribers: null }
   return [
-    {
-      label: 'Total Products',
-      value: stats.productCount.toLocaleString(),
-      change: '+8% from last month',
-      icon: Package,
-      gradientFrom: 'from-amber-50',
-      gradientTo: 'to-yellow-50',
-      iconBg: 'bg-gradient-to-br from-gold to-gold-light',
-      iconColor: 'text-white',
-    },
-    {
-      label: 'Total Orders',
-      value: stats.orderCount.toLocaleString(),
-      change: '+12% from last month',
-      icon: ShoppingBag,
-      gradientFrom: 'from-rose-50',
-      gradientTo: 'to-pink-50',
-      iconBg: 'bg-gradient-to-br from-rose to-rose-light',
-      iconColor: 'text-white',
-    },
-    {
-      label: 'Total Revenue',
-      value: `$${stats.totalRevenue.toLocaleString()}`,
-      change: '+18% from last month',
-      icon: DollarSign,
-      gradientFrom: 'from-emerald-50',
-      gradientTo: 'to-green-50',
-      iconBg: 'bg-gradient-to-br from-emerald-500 to-emerald-400',
-      iconColor: 'text-white',
-    },
-    {
-      label: 'Subscribers',
-      value: stats.subscriberCount.toLocaleString(),
-      change: '+5% from last month',
-      icon: Users,
-      gradientFrom: 'from-purple-50',
-      gradientTo: 'to-violet-50',
-      iconBg: 'bg-gradient-to-br from-purple-500 to-purple-400',
-      iconColor: 'text-white',
-    },
+    { label: 'Total Products', value: stats.productCount.toLocaleString(), change: changes.products, icon: Package, gradientFrom: 'from-amber-50', gradientTo: 'to-yellow-50', iconBg: 'bg-gradient-to-br from-gold to-gold-light', iconColor: 'text-white' },
+    { label: 'Total Orders', value: stats.orderCount.toLocaleString(), change: changes.orders, icon: ShoppingBag, gradientFrom: 'from-rose-50', gradientTo: 'to-pink-50', iconBg: 'bg-gradient-to-br from-rose to-rose-light', iconColor: 'text-white' },
+    { label: 'Total Revenue', value: `$${stats.totalRevenue.toLocaleString()}`, change: changes.revenue, icon: DollarSign, gradientFrom: 'from-emerald-50', gradientTo: 'to-green-50', iconBg: 'bg-gradient-to-br from-emerald-500 to-emerald-400', iconColor: 'text-white' },
+    { label: 'Subscribers', value: stats.subscriberCount.toLocaleString(), change: changes.subscribers, icon: Users, gradientFrom: 'from-purple-50', gradientTo: 'to-violet-50', iconBg: 'bg-gradient-to-br from-purple-500 to-purple-400', iconColor: 'text-white' },
   ]
 }
 
@@ -271,6 +245,7 @@ const sectionVariants: Variants = {
 export function DashboardOverview(props: DashboardOverviewProps) {
   const { stats, products } = props
   const statCards = buildStatCards(props)
+  const revenueData = buildRevenueData(stats)
 
   return (
     <div className="space-y-6">
@@ -285,34 +260,31 @@ export function DashboardOverview(props: DashboardOverviewProps) {
       >
         {statCards.map((card) => {
           const Icon = card.icon
+          const change = card.change
+          const hasChange = change !== null && change !== undefined
+          const isPositive = hasChange && change! >= 0
+          const changeColor = !hasChange ? 'bg-muted/60 text-muted-foreground' : isPositive ? 'bg-emerald-100/80 text-emerald-700' : 'bg-red-100/80 text-red-700'
+          const changeLabel = !hasChange ? '—' : `${isPositive ? '+' : ''}${change}%`
           return (
             <motion.div key={card.label} variants={cardVariants}>
-              <Card
-                className={`premium-card relative overflow-hidden bg-gradient-to-br ${card.gradientFrom} ${card.gradientTo} border-none shadow-md`}
-              >
+              <Card className={`premium-card relative overflow-hidden bg-gradient-to-br ${card.gradientFrom} ${card.gradientTo} border-none shadow-md`}>
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between">
                     <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${card.iconBg} shadow-lg`}>
                       <Icon className={`h-6 w-6 ${card.iconColor}`} />
                     </div>
-                    <div className="flex items-center gap-1 rounded-full bg-emerald-100/80 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                      <ArrowUpRight className="h-3 w-3" />
-                      {card.change.split('%')[0]}%
+                    <div className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${changeColor}`}>
+                      {hasChange && <ArrowUpRight className={`h-3 w-3 ${!isPositive ? 'rotate-90' : ''}`} />}
+                      {changeLabel}
                     </div>
                   </div>
-
                   <div className="mt-4">
-                    <p className="text-3xl font-bold tracking-tight text-foreground">
-                      {card.value}
-                    </p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {card.label}
-                    </p>
+                    <p className="text-3xl font-bold tracking-tight text-foreground">{card.value}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{card.label}</p>
                   </div>
-
                   <p className="mt-2 text-xs text-muted-foreground/70">
                     <TrendingUp className="mr-1 inline h-3 w-3" />
-                    {card.change}
+                    {hasChange ? `${isPositive ? '+' : ''}${change}% vs last month` : 'No prior month data yet'}
                   </p>
                 </CardContent>
               </Card>
@@ -333,7 +305,7 @@ export function DashboardOverview(props: DashboardOverviewProps) {
         <Card className="premium-card shadow-md border-none">
           <CardHeader>
             <CardTitle className="text-lg font-semibold">Revenue Overview</CardTitle>
-            <CardDescription>Monthly revenue for the last 6 months</CardDescription>
+            <CardDescription>Real revenue from paid orders — last 6 months</CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer config={revenueChartConfig} className="h-[300px] w-full">

@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   ImagePlus, Trash2, Edit, Plus, GripVertical, Play, Truck, Sparkles, Gift, Star, Heart,
-  Upload, Eye, EyeOff, Link as LinkIcon, Video, ImageIcon, MoveUp, MoveDown, Ban
+  Upload, Eye, EyeOff, Link as LinkIcon, Video, ImageIcon, MoveUp, MoveDown, Ban, Loader2
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -138,6 +138,48 @@ export default function VisualContentManagement() {
       fetch(`/api/hero-slides/${slide.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order: swapSlide.order }) }),
       fetch(`/api/hero-slides/${swapSlide.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order: slide.order }) }),
     ])
+    loadHeroSlides()
+  }
+
+  // Batch upload: select multiple files at once → each becomes a hero slide
+  const heroBatchRef = useRef<HTMLInputElement>(null)
+  const [batchUploading, setBatchUploading] = useState(false)
+  const [batchProgress, setBatchProgress] = useState({ done: 0, total: 0 })
+
+  const handleHeroBatchUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+    if (!confirm(`Create ${files.length} hero slide${files.length > 1 ? 's' : ''}? Each file becomes a separate slide.`)) {
+      if (heroBatchRef.current) heroBatchRef.current.value = ''
+      return
+    }
+    setBatchUploading(true)
+    setBatchProgress({ done: 0, total: files.length })
+    let success = 0
+    let failed = 0
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      try {
+        const url = await uploadFile(file, 'hero')
+        const mediaType = file.type.startsWith('video/') ? 'video' : 'image'
+        const res = await fetch('/api/hero-slides', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+            subtitle: '', mediaUrl: url, mediaType, active: true,
+            order: heroSlides.length + i, overlayDark: 0.5, kenBurns: true,
+          }),
+        })
+        if (res.ok) success++; else failed++
+      } catch { failed++ }
+      setBatchProgress({ done: i + 1, total: files.length })
+    }
+    setBatchUploading(false)
+    setBatchProgress({ done: 0, total: 0 })
+    if (heroBatchRef.current) heroBatchRef.current.value = ''
+    if (success > 0 && failed === 0) toast.success(`Created ${success} slide${success > 1 ? 's' : ''}!`)
+    else if (success > 0 && failed > 0) toast.success(`Created ${success} slide${success > 1 ? 's' : ''}, ${failed} failed`)
+    else toast.error('All uploads failed')
     loadHeroSlides()
   }
 
@@ -267,7 +309,16 @@ export default function VisualContentManagement() {
               <h3 className="text-lg font-semibold" style={{ fontFamily: 'var(--font-playfair), serif' }}>Hero Background Slides</h3>
               <p className="text-sm text-muted-foreground">Manage the cinematic background images/videos in the hero section</p>
             </div>
-            <Dialog open={heroDialogOpen} onOpenChange={setHeroDialogOpen}>
+            <div className="flex items-center gap-2">
+              <input type="file" ref={heroBatchRef} accept="image/*,video/*" multiple onChange={handleHeroBatchUpload} className="hidden" />
+              <Button variant="outline" onClick={() => heroBatchRef.current?.click()} disabled={batchUploading} className="border-gold/30 text-gold">
+                {batchUploading ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{batchProgress.done}/{batchProgress.total}</>
+                ) : (
+                  <><ImagePlus className="w-4 h-4 mr-2" /> Upload Multiple</>
+                )}
+              </Button>
+              <Dialog open={heroDialogOpen} onOpenChange={setHeroDialogOpen}>
               <DialogTrigger asChild>
                 <Button className="bg-gold hover:bg-gold-light text-white" onClick={() => { setEditingHeroSlide(null); setHeroForm({ title: '', subtitle: '', mediaUrl: '', mediaType: 'image', active: true, order: heroSlides.length, overlayDark: 0.5, kenBurns: true }) }}>
                   <Plus className="w-4 h-4 mr-2" /> Add Slide
@@ -292,7 +343,7 @@ export default function VisualContentManagement() {
                   {heroForm.mediaUrl && (
                     <div className="relative rounded-lg overflow-hidden h-40 bg-blush/20 border border-blush/30">
                       {heroForm.mediaType === 'video' ? (
-                        <video src={heroForm.mediaUrl} className="w-full h-full object-cover" muted />
+                        <video src={heroForm.mediaUrl} className="w-full h-full object-cover" autoPlay muted loop playsInline preload="metadata" />
                       ) : (
                         <img src={heroForm.mediaUrl} alt="Preview" className="w-full h-full object-cover" />
                       )}
@@ -327,6 +378,7 @@ export default function VisualContentManagement() {
                 </div>
               </DialogContent>
             </Dialog>
+            </div>
           </div>
 
           <div className="grid gap-4">
@@ -341,7 +393,7 @@ export default function VisualContentManagement() {
                   <div className="flex">
                     <div className="w-40 h-28 shrink-0 bg-blush/10 relative">
                       {slide.mediaType === 'video' ? (
-                        <video src={slide.mediaUrl} className="w-full h-full object-cover" muted />
+                        <video src={slide.mediaUrl} className="w-full h-full object-cover" autoPlay muted loop playsInline preload="metadata" />
                       ) : (
                         <img src={slide.mediaUrl} alt={slide.title} className="w-full h-full object-cover" />
                       )}

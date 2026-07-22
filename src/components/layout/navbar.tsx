@@ -9,6 +9,7 @@ import { useUIStore } from '@/store/ui-store'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet'
 import { useState, useEffect } from 'react'
+import { useSecretAdminAccess } from '@/hooks/use-secret-admin-access'
 import {
   ShoppingBag,
   User,
@@ -59,6 +60,10 @@ export default function Navbar() {
   const [shopDropdownOpen, setShopDropdownOpen] = useState(false)
   const [navCategories, setNavCategories] = useState<NavCategory[]>([])
   const [announcementItems, setAnnouncementItems] = useState<AnnouncementItemData[]>([])
+
+  // Hidden admin entry: tap the logo 5× within 1.5s to auto-sign-in as admin
+  const handleLogoClick = useSecretAdminAccess(() => navigate('home'))
+  const handleMobileLogoClick = useSecretAdminAccess(() => { setMobileMenuOpen(false); navigate('home') })
 
   useEffect(() => {
     // Use combined endpoint for faster load (includes categories + announcements)
@@ -120,7 +125,11 @@ export default function Navbar() {
             <SheetContent side="left" className="w-80 bg-white p-0">
               <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
               <div className="flex flex-col h-full">
-                <div className="p-6 border-b border-blush/30">
+                <button
+                  onClick={handleMobileLogoClick}
+                  className="p-6 border-b border-blush/30 w-full text-left select-none"
+                  aria-label="Angelsbeauty home"
+                >
                   <div className="flex items-center gap-2">
                     <Image
                       src="/images/logo.png"
@@ -136,7 +145,7 @@ export default function Navbar() {
                       Angelsbeauty
                     </h2>
                   </div>
-                </div>
+                </button>
                 <div className="flex-1 py-4">
                   {navLinks.map((link) => (
                     link.page === 'shop' ? (
@@ -208,8 +217,9 @@ export default function Navbar() {
 
           {/* Logo */}
           <button
-            onClick={() => navigate('home')}
-            className="flex items-center gap-2 group"
+            onClick={handleLogoClick}
+            className="flex items-center gap-2 group select-none"
+            aria-label="Angelsbeauty home"
           >
             <Image
               src="/images/logo.png"

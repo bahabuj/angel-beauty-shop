@@ -1073,6 +1073,7 @@ export default function ProductsManagement({
                         <video
                           src={url}
                           className="h-full w-full object-cover"
+                          autoPlay
                           muted
                           loop
                           playsInline

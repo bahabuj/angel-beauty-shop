@@ -52,6 +52,13 @@ interface Stats {
   productCount: number; orderCount: number; subscriberCount: number
   promoCount: number; totalRevenue: number
   recentOrders: Order[]
+  revenueByMonth?: Array<{ month: string; revenue: number }>
+  changes?: {
+    products: number | null
+    orders: number | null
+    revenue: number | null
+    subscribers: number | null
+  }
 }
 
 type AdminPage = 'dashboard' | 'products' | 'categories' | 'orders' | 'banners' | 'visual-content' | 'auth-slides' | 'before-after' | 'inspiration-hub' | 'newsletter' | 'settings'

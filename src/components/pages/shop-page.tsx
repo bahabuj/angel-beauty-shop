@@ -12,6 +12,14 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { ShoppingBag, Search, Sparkles, SlidersHorizontal, X } from 'lucide-react'
 import { toast } from 'sonner'
 
+// Detect whether a stored media URL is a video (used to render <video> vs <img>).
+function isVideoUrl(url: string): boolean {
+  if (!url) return false
+  if (/\/video\/upload\//i.test(url)) return true
+  if (/\/image\/upload\//i.test(url)) return false
+  return /\.(mp4|webm|ogg|ogv|mov|mkv)(\?|$)/i.test(url)
+}
+
 interface Variant {
   id: string
   name: string
@@ -267,11 +275,23 @@ export default function ShopPage() {
                     <Card key={product.id} className="premium-card border-blush/30 bg-white overflow-hidden group cursor-pointer" onClick={() => navigate('product', { slug: product.slug })}>
                       <div className="relative aspect-[4/3] overflow-hidden">
                         {images[0] ? (
-                          <img
-                            src={images[0]}
-                            alt={product.name}
-                            className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
-                          />
+                          isVideoUrl(images[0]) ? (
+                            <video
+                              src={images[0]}
+                              className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                              autoPlay
+                              muted
+                              loop
+                              playsInline
+                              preload="metadata"
+                            />
+                          ) : (
+                            <img
+                              src={images[0]}
+                              alt={product.name}
+                              className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                            />
+                          )
                         ) : (
                           <div className="w-full h-full bg-gradient-to-br from-blush/30 to-cream flex items-center justify-center">
                             <div className="text-center">

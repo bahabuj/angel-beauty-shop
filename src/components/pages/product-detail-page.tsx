@@ -11,6 +11,14 @@ import { ShoppingBag, Heart, Shield, Truck, Award, Check, Minus, Plus, Sparkles,
 import { toast } from 'sonner'
 import Image from 'next/image'
 
+// Detect whether a stored media URL is a video (used to render <video> vs <Image>).
+function isVideoUrl(url: string): boolean {
+  if (!url) return false
+  if (/\/video\/upload\//i.test(url)) return true
+  if (/\/image\/upload\//i.test(url)) return false
+  return /\.(mp4|webm|ogg|ogv|mov|mkv)(\?|$)/i.test(url)
+}
+
 interface Variant {
   id: string
   name: string
@@ -258,15 +266,29 @@ export default function ProductDetailPage() {
           {/* Image gallery */}
           <div className="aspect-square rounded-2xl overflow-hidden relative">
             {images[0] ? (
-              <Image
-                key={images[selectedImage] || images[0]}
-                src={images[selectedImage] || images[0]}
-                alt={product.name}
-                fill
-                priority
-                sizes="(max-width: 1024px) 100vw, 50vw"
-                className="object-cover"
-              />
+              isVideoUrl(images[selectedImage] || images[0]) ? (
+                <video
+                  key={images[selectedImage] || images[0]}
+                  src={images[selectedImage] || images[0]}
+                  className="w-full h-full object-cover"
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  controls
+                  preload="metadata"
+                />
+              ) : (
+                <Image
+                  key={images[selectedImage] || images[0]}
+                  src={images[selectedImage] || images[0]}
+                  alt={product.name}
+                  fill
+                  priority
+                  sizes="(max-width: 1024px) 100vw, 50vw"
+                  className="object-cover"
+                />
+              )
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-blush/30 via-cream to-blush/10 flex items-center justify-center">
                 <div className="text-center">
@@ -292,7 +314,11 @@ export default function ProductDetailPage() {
                   onClick={() => setSelectedImage(i)}
                   className={`w-20 h-20 rounded-lg overflow-hidden border-2 transition-colors ${i === selectedImage ? 'border-gold' : 'border-transparent'}`}
                 >
-                  <Image src={img} alt={`${product.name} ${i + 1}`} fill sizes="80px" className="object-cover" />
+                  {isVideoUrl(img) ? (
+                    <video src={img} className="w-full h-full object-cover" muted loop playsInline preload="metadata" />
+                  ) : (
+                    <Image src={img} alt={`${product.name} ${i + 1}`} fill sizes="80px" className="object-cover" />
+                  )}
                 </button>
               ))}
             </div>

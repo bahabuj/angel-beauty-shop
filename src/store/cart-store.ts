@@ -20,6 +20,14 @@ export interface CartItem {
 interface CartState {
   items: CartItem[]
   /**
+   * Hydration flag — true once Zustand persist has finished rehydrating the
+   * store from localStorage. Components that show an "empty cart" state MUST
+   * wait for `_hasHydrated === true` before doing so, otherwise the empty
+   * state flashes for ~1s on every page load (because `items` is `[]` until
+   * localStorage is read on the client).
+   */
+  _hasHydrated: boolean
+  /**
    * Add an item to the cart.
    * - Items are deduplicated by composite key `${id}:${variantId}` so the
    *   same product in two different variants are separate cart lines.
@@ -38,6 +46,8 @@ interface CartState {
   getTotal: () => number
   getSubtotal: () => number
   getItemCount: () => number
+  /** Internal: called by persist's onRehydrateStorage. Do not call manually. */
+  _setHasHydrated: (state: boolean) => void
 }
 
 /** Build the composite dedupe key for a cart item. */
@@ -49,6 +59,7 @@ export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({
       items: [],
+      _hasHydrated: false,
       addItem: (item, allowIncrement = false) => {
         const qty = item.quantity ?? 1
         const key = cartItemKey(item.id, item.variantId)
@@ -87,7 +98,32 @@ export const useCartStore = create<CartState>()(
       getTotal: () => get().items.reduce((sum, i) => sum + i.price * i.quantity, 0),
       getSubtotal: () => get().items.reduce((sum, i) => sum + i.price * i.quantity, 0),
       getItemCount: () => get().items.reduce((sum, i) => sum + i.quantity, 0),
+      _setHasHydrated: (state) => set({ _hasHydrated: state }),
     }),
-    { name: 'angel-beauty-cart' }
+    {
+      name: 'angel-beauty-cart',
+      // ─── Hydration tracking ────────────────────────────────────────────────
+      // onRehydrateStorage is called by Zustand persist once the store has
+      // finished rehydrating from localStorage. We flip _hasHydrated to true
+      // so components can stop showing the loading state and start checking
+      // the real cart contents.
+      onRehydrateStorage: () => (state) => {
+        state?._setHasHydrated(true)
+      },
+    }
   )
 )
+
+/**
+ * Convenience hook: returns true once the cart store has finished rehydrating
+ * from localStorage. Use this in components that render an "empty cart" state
+ * to avoid the flash of empty content during initial hydration.
+ *
+ * Usage:
+ *   const hasHydrated = useCartHydrated()
+ *   if (!hasHydrated) return <LoadingSpinner />
+ *   if (items.length === 0) return <EmptyCart />
+ */
+export function useCartHydrated(): boolean {
+  return useCartStore((s) => s._hasHydrated)
+}

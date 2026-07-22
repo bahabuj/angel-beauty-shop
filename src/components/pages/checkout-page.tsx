@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react'
 import { useNavStore } from '@/store/nav-store'
-import { useCartStore } from '@/store/cart-store'
+import { useCartStore, useCartHydrated } from '@/store/cart-store'
 import { useAuthStore } from '@/store/auth-store'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -19,6 +19,7 @@ export default function CheckoutPage() {
   const items = useCartStore((s) => s.items)
   const getSubtotal = useCartStore((s) => s.getSubtotal)
   const clearCart = useCartStore((s) => s.clearCart)
+  const hasHydrated = useCartHydrated()
   const user = useAuthStore((s) => s.user)
   const [phase, setPhase] = useState<CheckoutPhase>('info')
   const [errorMessage, setErrorMessage] = useState('')
@@ -142,7 +143,23 @@ export default function CheckoutPage() {
     }
   }
 
-  // ─── Empty Cart ──────────────────────────────────────────────────────────
+  // ─── Loading (cart hydration) ─────────────────────────────────────────────
+  // Zustand persist rehydrates from localStorage on the client. Until
+  // hydration completes, `items` is `[]` and we'd incorrectly show "Your
+  // cart is empty". Show a loading spinner instead so the empty state only
+  // appears once we KNOW the cart is actually empty.
+  if (!hasHydrated) {
+    return (
+      <div className="py-12 flex items-center justify-center min-h-[50vh]">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 text-gold mx-auto mb-3 animate-spin" />
+          <p className="text-sm text-muted-foreground">Loading your cart…</p>
+        </div>
+      </div>
+    )
+  }
+
+  // ─── Empty Cart (only after hydration) ────────────────────────────────────
   if (items.length === 0 && phase !== 'error') {
     return (
       <div className="py-12 flex items-center justify-center">

@@ -1,11 +1,11 @@
 'use client'
 
 import { useNavStore } from '@/store/nav-store'
-import { useCartStore, cartItemKey } from '@/store/cart-store'
+import { useCartStore, cartItemKey, useCartHydrated } from '@/store/cart-store'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Minus, Plus, Trash2, ShoppingBag, ArrowRight, ArrowLeft, Shield, Truck } from 'lucide-react'
+import { Minus, Plus, Trash2, ShoppingBag, ArrowRight, ArrowLeft, Shield, Truck, Loader2 } from 'lucide-react'
 
 export default function CartPage() {
   const navigate = useNavStore((s) => s.navigate)
@@ -15,11 +15,27 @@ export default function CartPage() {
   const getSubtotal = useCartStore((s) => s.getSubtotal)
   const getItemCount = useCartStore((s) => s.getItemCount)
   const clearCart = useCartStore((s) => s.clearCart)
+  const hasHydrated = useCartHydrated()
   const subtotal = getSubtotal()
   const itemCount = getItemCount()
   const hasFreeShipping = items.some(item => item.freeShipping)
   const shipping = hasFreeShipping || subtotal >= 100 ? 0 : 15
   const total = subtotal + shipping
+
+  // ─── Loading (cart hydration) ─────────────────────────────────────────────
+  // Wait for Zustand persist to finish rehydrating from localStorage before
+  // checking items.length. Otherwise the empty cart state flashes for ~1s
+  // on every page load because items is [] until hydration completes.
+  if (!hasHydrated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 text-gold mx-auto mb-3 animate-spin" />
+          <p className="text-sm text-muted-foreground">Loading your cart…</p>
+        </div>
+      </div>
+    )
+  }
 
   if (items.length === 0) {
     return (

@@ -2,7 +2,6 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: false,
-  compress: false,
   // Disable Fast Refresh fallback to full page reload
   // This prevents HMR websocket failures from causing infinite reload loops
   devIndicators: false,
@@ -41,15 +40,17 @@ const nextConfig: NextConfig = {
       },
     ]
   },
-  webpack: (config, { dev }) => {
-    if (dev) {
-      // Disable HMR polling fallback to prevent full page reloads
-      config.watchOptions = {
-        ...config.watchOptions,
-        poll: 1000, // Poll every 1s instead of aggressively
-      }
-    }
-    return config
+  // ─── Next.js 16 Turbopack ────────────────────────────────────────────────────
+  // Next.js 16 enables Turbopack by default for both dev and build. The
+  // previous webpack() customization (HMR polling for the sandbox dev server)
+  // is no longer needed in production. Declaring an empty `turbopack` config
+  // silences the "webpack config without turbopack config" error.
+  turbopack: {},
+  // ─── Vercel-friendly serverless settings ────────────────────────────────────
+  // Prisma client needs to be bundled for serverless. This is the default in
+  // Next 16 but explicit here for clarity.
+  outputFileTracingIncludes: {
+    '/': ['./node_modules/@prisma/client/**', './prisma/**'],
   },
 };
 

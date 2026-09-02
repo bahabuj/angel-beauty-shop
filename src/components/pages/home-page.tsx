@@ -63,12 +63,6 @@ interface Product {
   variants?: Variant[]
 }
 
-/**
- * A product is considered "multi-variant" (and therefore eligible for the
- * "From $X" price label) when it has more than one ACTIVE variant. The price
- * shown is `product.price` — a denormalized cache equal to the min active
- * variant price maintained by the backend.
- */
 function hasMultipleActiveVariants(product: Product): boolean {
   if (!product.variants || product.variants.length <= 1) return false
   return product.variants.filter((v) => v.active !== false).length > 1
@@ -90,14 +84,13 @@ interface TransformationData { id: string; name: string; duration: string; resul
 interface InspirationData { id: string; label: string; tip: string; image: string; icon: string; color: string; active: boolean; order: number }
 
 interface HomePageProps {
-  /** Server-rendered initial data — lets the page paint instantly with no API round-trip */
   initialData?: HomeData | null
 }
 
 export default function HomePage({ initialData }: HomePageProps = {}) {
   const navigate = useNavStore((s) => s.navigate)
   const addItem = useCartStore((s) => s.addItem)
-  // Seed state from SSR data so the first paint is complete (no spinner, no empty grid)
+
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>(
     (initialData?.featured as Product[]) || []
   )
@@ -127,7 +120,6 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
   )
   const hasInitialData = !!(initialData && (initialData.featured?.length || initialData.heroSlides?.length))
 
-  // Fallback transformation data for initial render
   const DEFAULT_TRANSFORMATIONS: TransformationData[] = [
     { id: 'default-1', name: 'Sarah J.', duration: '4 weeks', result: 'Smoother, brighter skin', beforeImg: '/images/transformations/before-1.png', afterImg: '/images/transformations/after-1.png', active: true, order: 0 },
     { id: 'default-2', name: 'Chioma A.', duration: '6 weeks', result: 'Reduced dark spots & even tone', beforeImg: '/images/transformations/before-2.png', afterImg: '/images/transformations/after-2.png', active: true, order: 1 },
@@ -135,7 +127,6 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
   ]
   const displayTransformations = transformations.length > 0 ? transformations : DEFAULT_TRANSFORMATIONS
 
-  // Fallback inspiration data for initial render
   const DEFAULT_INSPIRATION: InspirationData[] = [
     { id: 'default-1', label: 'Daily Essentials', tip: 'Start your day with a gentle cleanser & SPF moisturizer', image: '/images/social/social-1.png', icon: 'Sun', color: 'from-amber-500/80', active: true, order: 0 },
     { id: 'default-2', label: 'Glowing Skin', tip: 'Vitamin C serum + hyaluronic acid = instant radiance', image: '/images/social/social-2.png', icon: 'Sun', color: 'from-gold/80', active: true, order: 1 },
@@ -148,7 +139,6 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
   ]
   const displayInspiration = inspirationItems.length > 0 ? inspirationItems : DEFAULT_INSPIRATION
 
-  // Map icon names to components for inspiration section
   const iconMap: Record<string, React.ComponentType<{ className?: string }>> = { Sun, Heart, Check }
   const DEFAULT_PARTNERS: PartnerData[] = [
     { id: 'default-1', name: 'LUXORA', logo: '/images/partners/partner-1.png', url: '#' },
@@ -161,8 +151,6 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
   const displayPartners = partners.length > 0 ? partners : DEFAULT_PARTNERS
 
   useEffect(() => {
-    // If we already have SSR data, do a silent background refresh after mount
-    // so content stays fresh without blocking the first paint.
     if (hasInitialData) {
       const controller = new AbortController()
       fetch('/api/home-data', { signal: controller.signal })
@@ -178,11 +166,10 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
           if (data.transformations?.length) setTransformations(data.transformations)
           if (data.inspirationItems?.length) setInspirationItems(data.inspirationItems)
         })
-        .catch(() => { /* background refresh — ignore errors */ })
+        .catch(() => {})
       return () => controller.abort()
     }
 
-    // No SSR data — fetch with retry (cold-start path)
     let attempts = 0
     const maxAttempts = 3
     function loadData() {
@@ -240,28 +227,6 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
       toast.info(`${product.name} is already in your cart`, {
         description: 'You can adjust the quantity from your cart',
       })
-    }
-  }
-
-  const handleNewsletter = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!newsletterEmail) return
-    try {
-      const res = await fetch('/api/newsletter', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: newsletterEmail }),
-      })
-      const data = await res.json()
-      if (data.success) {
-        setSubscribed(true)
-        setNewsletterEmail('')
-        toast.success('Welcome to the Angel Beauty Family!')
-      } else {
-        toast.error(data.error || 'Subscription failed')
-      }
-    } catch {
-      toast.error('Something went wrong')
     }
   }
 
@@ -371,10 +336,8 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
     )
   }
 
-  // Hero background slideshow state
   const [heroBgIndex, setHeroBgIndex] = useState(0)
 
-  // Fallback hero images if no DB slides
   const FALLBACK_HERO_IMAGES = [
     '/images/hero/hero-2.png',
     '/images/hero/hero-3.png',
@@ -395,58 +358,57 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
     <div>
       {/* Hero Section */}
       <section className="relative min-h-[85vh] flex items-center overflow-hidden">
-        {/* Cinematic Image Motion Background */}
+        {/* Background slideshow */}
         <div className="absolute inset-0">
           {heroItems.map((slide, i) => {
             const isActive = i === heroBgIndex
             const isPreloadNext = i === (heroBgIndex + 1) % heroItems.length
             if (!isActive && !isPreloadNext) return null
             return (
-            <motion.div
-              key={slide.id}
-              className="absolute inset-0"
-              initial={false}
-              animate={{
-                opacity: i === heroBgIndex ? 1 : 0,
-                scale: i === heroBgIndex && slide.kenBurns ? 1.08 : 1,
-              }}
-              transition={{
-                opacity: { duration: 1.8, ease: 'easeInOut' },
-                scale: { duration: 8, ease: 'linear' },
-              }}
-              style={{ zIndex: i === heroBgIndex ? 1 : 0 }}
-            >
-              {slide.mediaType === 'video' ? (
-                <video
-                  src={slide.mediaUrl}
-                  autoPlay={isActive}
-                  muted
-                  loop
-                  playsInline
-                  preload={isActive ? 'auto' : 'metadata'}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <Image
-                  src={slide.mediaUrl}
-                  alt=""
-                  fill
-                  priority={i === 0}
-                  sizes="100vw"
-                  className="object-cover"
-                />
-              )}
-            </motion.div>
+              <motion.div
+                key={slide.id}
+                className="absolute inset-0"
+                initial={false}
+                animate={{
+                  opacity: i === heroBgIndex ? 1 : 0,
+                  scale: i === heroBgIndex && slide.kenBurns ? 1.08 : 1,
+                }}
+                transition={{
+                  opacity: { duration: 1.8, ease: 'easeInOut' },
+                  scale: { duration: 8, ease: 'linear' },
+                }}
+                style={{ zIndex: i === heroBgIndex ? 1 : 0 }}
+              >
+                {slide.mediaType === 'video' ? (
+                  <video
+                    src={slide.mediaUrl}
+                    autoPlay={isActive}
+                    muted
+                    loop
+                    playsInline
+                    preload={isActive ? 'auto' : 'metadata'}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <Image
+                    src={slide.mediaUrl}
+                    alt=""
+                    fill
+                    priority={i === 0}
+                    sizes="100vw"
+                    className="object-cover"
+                  />
+                )}
+              </motion.div>
             )
           })}
           {/* Dark overlay for text readability */}
           <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/40 to-black/20 z-[2]" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/20 z-[2]" />
-          {/* Warm golden tint overlay */}
           <div className="absolute inset-0 bg-gradient-to-br from-gold/10 via-transparent to-rose/10 z-[2]" />
         </div>
 
-        {/* Floating decorative elements */}
+        {/* Floating background heart element */}
         <div className="absolute top-48 right-[25%] animate-float opacity-25 z-[3]" style={{ animationDelay: '1s' }}>
           <Heart className="w-6 h-6 text-rose-light" />
         </div>
@@ -464,6 +426,7 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
           ))}
         </div>
 
+        {/* Main Content Container - Single Column Layout */}
         <div className="relative max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 w-full z-[3]">
           <div className="max-w-2xl">
             <motion.div
@@ -883,31 +846,31 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
             {displayInspiration.map((item, i) => {
               const IconComp = iconMap[item.icon] || Sun
               return (
-              <motion.div
-                key={item.id}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.4, delay: i * 0.05 }}
-                className="aspect-square rounded-2xl overflow-hidden group cursor-pointer relative"
-              >
-                <Image
-                  src={item.image}
-                  alt={item.label}
-                  fill
-                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 250px"
-                  className="object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
-                />
-                <div className="absolute top-3 left-3">
-                  <span className="inline-flex items-center gap-1 bg-white/90 backdrop-blur-sm text-[10px] font-bold px-2.5 py-1 rounded-full text-foreground shadow-sm">
-                    <IconComp className="w-3 h-3 text-gold" />
-                    {item.label}
-                  </span>
-                </div>
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-end p-4">
-                  <p className="text-white text-xs sm:text-sm font-medium text-center leading-relaxed">{item.tip}</p>
-                </div>
-                <div className={`absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r ${item.color} to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
-              </motion.div>
+                <motion.div
+                  key={item.id}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.4, delay: i * 0.05 }}
+                  className="aspect-square rounded-2xl overflow-hidden group cursor-pointer relative"
+                >
+                  <Image
+                    src={item.image}
+                    alt={item.label}
+                    fill
+                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 250px"
+                    className="object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+                  />
+                  <div className="absolute top-3 left-3">
+                    <span className="inline-flex items-center gap-1 bg-white/90 backdrop-blur-sm text-[10px] font-bold px-2.5 py-1 rounded-full text-foreground shadow-sm">
+                      <IconComp className="w-3 h-3 text-gold" />
+                      {item.label}
+                    </span>
+                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-end p-4">
+                    <p className="text-white text-xs sm:text-sm font-medium text-center leading-relaxed">{item.tip}</p>
+                  </div>
+                  <div className={`absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r ${item.color} to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
+                </motion.div>
               )
             })}
           </div>

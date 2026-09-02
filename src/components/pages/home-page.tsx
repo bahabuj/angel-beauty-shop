@@ -16,13 +16,10 @@ import {
   Shield,
   Truck,
   Award,
-  Sparkles,
   Heart,
   ChevronLeft,
   ChevronRight,
   Check,
-  Leaf,
-  Droplets,
   Sun,
   Instagram,
 } from 'lucide-react'
@@ -141,18 +138,18 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
   // Fallback inspiration data for initial render
   const DEFAULT_INSPIRATION: InspirationData[] = [
     { id: 'default-1', label: 'Daily Essentials', tip: 'Start your day with a gentle cleanser & SPF moisturizer', image: '/images/social/social-1.png', icon: 'Sun', color: 'from-amber-500/80', active: true, order: 0 },
-    { id: 'default-2', label: 'Glowing Skin', tip: 'Vitamin C serum + hyaluronic acid = instant radiance', image: '/images/social/social-2.png', icon: 'Sparkles', color: 'from-gold/80', active: true, order: 1 },
-    { id: 'default-3', label: 'Luxury Creams', tip: 'Night creams work wonders while you sleep', image: '/images/social/social-3.png', icon: 'Droplets', color: 'from-rose-500/80', active: true, order: 2 },
+    { id: 'default-2', label: 'Glowing Skin', tip: 'Vitamin C serum + hyaluronic acid = instant radiance', image: '/images/social/social-2.png', icon: 'Sun', color: 'from-gold/80', active: true, order: 1 },
+    { id: 'default-3', label: 'Luxury Creams', tip: 'Night creams work wonders while you sleep', image: '/images/social/social-3.png', icon: 'Sun', color: 'from-rose-500/80', active: true, order: 2 },
     { id: 'default-4', label: 'Skin Routine', tip: 'Consistency is key — 3 steps morning & night', image: '/images/social/social-4.png', icon: 'Check', color: 'from-emerald-500/80', active: true, order: 3 },
-    { id: 'default-5', label: 'Golden Oils', tip: 'Rosehip oil fades scars & boosts hydration', image: '/images/social/social-5.png', icon: 'Droplets', color: 'from-yellow-600/80', active: true, order: 4 },
+    { id: 'default-5', label: 'Golden Oils', tip: 'Rosehip oil fades scars & boosts hydration', image: '/images/social/social-5.png', icon: 'Sun', color: 'from-yellow-600/80', active: true, order: 4 },
     { id: 'default-6', label: 'Spa Self-Care', tip: 'Weekly face masks transform your skin texture', image: '/images/social/social-6.png', icon: 'Heart', color: 'from-pink-500/80', active: true, order: 5 },
     { id: 'default-7', label: 'Vitamin C Glow', tip: 'Brighten dull skin with a daily C serum', image: '/images/social/social-7.png', icon: 'Sun', color: 'from-orange-500/80', active: true, order: 6 },
-    { id: 'default-8', label: 'Natural Beauty', tip: 'Less is more — embrace your natural glow', image: '/images/social/social-8.png', icon: 'Leaf', color: 'from-green-500/80', active: true, order: 7 },
+    { id: 'default-8', label: 'Natural Beauty', tip: 'Less is more — embrace your natural glow', image: '/images/social/social-8.png', icon: 'Check', color: 'from-green-500/80', active: true, order: 7 },
   ]
   const displayInspiration = inspirationItems.length > 0 ? inspirationItems : DEFAULT_INSPIRATION
 
   // Map icon names to components for inspiration section
-  const iconMap: Record<string, React.ComponentType<{ className?: string }>> = { Sun, Sparkles, Droplets, Heart, Leaf, Check }
+  const iconMap: Record<string, React.ComponentType<{ className?: string }>> = { Sun, Heart, Check }
   const DEFAULT_PARTNERS: PartnerData[] = [
     { id: 'default-1', name: 'LUXORA', logo: '/images/partners/partner-1.png', url: '#' },
     { id: 'default-2', name: 'GLOWEN', logo: '/images/partners/partner-2.png', url: '#' },
@@ -167,7 +164,6 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
     // If we already have SSR data, do a silent background refresh after mount
     // so content stays fresh without blocking the first paint.
     if (hasInitialData) {
-      // Background refresh — non-blocking, keeps cache warm
       const controller = new AbortController()
       fetch('/api/home-data', { signal: controller.signal })
         .then(r => r.ok ? r.json() : null)
@@ -317,7 +313,7 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
             <div className="w-full h-full bg-gradient-to-br from-blush/30 to-cream flex items-center justify-center">
               <div className="text-center">
                 <div className="w-16 h-16 mx-auto mb-2 rounded-full bg-white/60 flex items-center justify-center">
-                  <Sparkles className="w-8 h-8 text-gold" />
+                  <Star className="w-8 h-8 text-gold" />
                 </div>
                 <p className="text-xs text-foreground/40 font-medium">{product.categorySlug}</p>
               </div>
@@ -333,7 +329,6 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
               NEW
             </Badge>
           )}
-          {/* Smooth hover overlay — gradient from bottom, no layout shift */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-4">
             <div className="flex gap-2">
               <Button
@@ -359,8 +354,7 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
               {product.categorySlug}
             </span>
           </div>
-          <h3 className="font-semibold text-sm mb-1 line-clamp-1 group-hover:text-gold transition-colors duration-300"
-          >
+          <h3 className="font-semibold text-sm mb-1 line-clamp-1 group-hover:text-gold transition-colors duration-300">
             {product.name}
           </h3>
           <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{product.description}</p>
@@ -404,10 +398,6 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
         {/* Cinematic Image Motion Background */}
         <div className="absolute inset-0">
           {heroItems.map((slide, i) => {
-            // PERF: only mount the active slide + the next one (preloaded).
-            // Previously ALL slides (including a 3.3MB autoplay video) were
-            // mounted at once, causing every video/image to download on first
-            // paint. Now inactive slides are unmounted → zero network cost.
             const isActive = i === heroBgIndex
             const isPreloadNext = i === (heroBgIndex + 1) % heroItems.length
             if (!isActive && !isPreloadNext) return null
@@ -457,14 +447,8 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
         </div>
 
         {/* Floating decorative elements */}
-        <div className="absolute top-32 left-[15%] animate-float opacity-30 z-[3]">
-          <Sparkles className="w-8 h-8 text-gold-light" />
-        </div>
         <div className="absolute top-48 right-[25%] animate-float opacity-25 z-[3]" style={{ animationDelay: '1s' }}>
           <Heart className="w-6 h-6 text-rose-light" />
-        </div>
-        <div className="absolute bottom-32 left-[30%] animate-float opacity-25 z-[3]" style={{ animationDelay: '2s' }}>
-          <Droplets className="w-7 h-7 text-gold-light" />
         </div>
 
         {/* Slideshow indicators */}
@@ -481,7 +465,7 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
         </div>
 
         <div className="relative max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 w-full z-[3]">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
+          <div className="max-w-2xl">
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
@@ -551,8 +535,8 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
                 </div>
               </motion.div>
             </motion.div>
-
-            
+          </div>
+        </div>
       </section>
 
       {/* Featured Products */}
@@ -588,13 +572,11 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
         </section>
       )}
 
-      {/* Promo Billboard — Animated Sliding Carousel */}
+      {/* Promo Billboard */}
       {promos.length > 0 && (
         <section className="py-12">
           <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="relative rounded-3xl overflow-hidden min-h-[320px] sm:min-h-[360px] flex items-center">
-
-              {/* ===== ANIMATED SLIDING BACKGROUNDS ===== */}
               <AnimatePresence mode="wait">
                 <motion.div
                   key={currentPromo}
@@ -604,10 +586,8 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
                   transition={{ duration: 0.7, ease: [0.4, 0, 0.2, 1] }}
                   className="absolute inset-0"
                 >
-                  {/* Background image (if promo has one) */}
                   {promos[currentPromo]?.image ? (
                     <>
-                      {/* Ken Burns slow zoom on the image */}
                       <motion.div
                         animate={{ scale: [1, 1.08, 1] }}
                         transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
@@ -621,82 +601,20 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
                           className="object-cover"
                         />
                       </motion.div>
-                      {/* Dark overlay for text readability */}
                       <div className="absolute inset-0 bg-black/40" />
                     </>
                   ) : (
-                    <>
-                      {/* Dynamic gradient per promo (fallback when no image) */}
-                      <div className={`absolute inset-0 ${
-                        currentPromo % 3 === 0
-                          ? 'bg-gradient-to-br from-gold via-gold-light to-gold'
-                          : currentPromo % 3 === 1
-                            ? 'bg-gradient-to-br from-rose-dark via-rose to-rose-light'
-                            : 'bg-gradient-to-br from-gold via-rose-light to-gold-light'
-                      }`} />
-
-                      {/* Ken Burns slow zoom effect */}
-                      <motion.div
-                        animate={{ scale: [1, 1.08, 1] }}
-                        transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
-                        className="absolute inset-0"
-                      >
-                        {/* Large floating orbs - moving continuously */}
-                        <motion.div
-                          animate={{ x: [0, 80, 0], y: [0, -40, 0] }}
-                          transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
-                          className="absolute top-0 right-0 w-72 h-72 rounded-full bg-white/10 blur-2xl"
-                        />
-                        <motion.div
-                          animate={{ x: [0, -60, 0], y: [0, 50, 0] }}
-                          transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
-                          className="absolute bottom-0 left-0 w-96 h-96 rounded-full bg-white/8 blur-3xl"
-                        />
-                        <motion.div
-                          animate={{ x: [0, 40, 0], y: [0, 30, 0] }}
-                          transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
-                          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full bg-white/6 blur-2xl"
-                        />
-                      </motion.div>
-                    </>
+                    <div className={`absolute inset-0 ${
+                      currentPromo % 3 === 0
+                        ? 'bg-gradient-to-br from-gold via-gold-light to-gold'
+                        : currentPromo % 3 === 1
+                          ? 'bg-gradient-to-br from-rose-dark via-rose to-rose-light'
+                          : 'bg-gradient-to-br from-gold via-rose-light to-gold-light'
+                    }`} />
                   )}
                 </motion.div>
               </AnimatePresence>
 
-              {/* ===== ANIMATED FLOATING ORBS ===== */}
-              <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                {[
-                  { size: 80, top: '20%', left: '10%', delay: 0, dur: 8 },
-                  { size: 60, top: '60%', left: '80%', delay: 2, dur: 10 },
-                  { size: 50, top: '40%', left: '50%', delay: 1, dur: 12 },
-                ].map((p, i) => (
-                  <motion.div
-                    key={i}
-                    animate={{
-                      y: [0, -20, 0],
-                      x: [0, 10, 0],
-                      scale: [1, 1.1, 1],
-                    }}
-                    transition={{
-                      duration: p.dur,
-                      repeat: Infinity,
-                      ease: 'easeInOut',
-                      delay: p.delay,
-                    }}
-                    className="absolute rounded-full bg-white/10 blur-xl"
-                    style={{
-                      width: p.size,
-                      height: p.size,
-                      top: p.top,
-                      left: p.left,
-                    }}
-                  />
-                ))}
-              </div>
-
-
-
-              {/* ===== CONTENT LAYER ===== */}
               <div className="relative z-10 w-full px-8 sm:px-12 py-10 text-white text-center">
                 <AnimatePresence mode="wait">
                   <motion.div
@@ -706,19 +624,12 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
                     exit={{ opacity: 0, x: -80, scale: 0.95 }}
                     transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
                   >
-                    {/* Animated badge */}
                     <motion.div
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.2 }}
                       className="inline-flex items-center gap-1.5 bg-white/15 backdrop-blur-md border border-white/20 rounded-full px-4 py-1.5 mb-4"
                     >
-                      <motion.span
-                        animate={{ rotate: [0, 15, -15, 0] }}
-                        transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-                      >
-                        <Sparkles className="w-3.5 h-3.5" />
-                      </motion.span>
                       <span className="text-xs font-medium tracking-wider uppercase">Special Offer</span>
                     </motion.div>
 
@@ -753,19 +664,13 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
                           size="lg"
                         >
                           {promos[currentPromo]?.ctaText}
-                          <motion.span
-                            animate={{ x: [0, 4, 0] }}
-                            transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
-                          >
-                            <ArrowRight className="w-4 h-4 ml-2" />
-                          </motion.span>
+                          <ArrowRight className="w-4 h-4 ml-2" />
                         </Button>
                       </motion.div>
                     )}
                   </motion.div>
                 </AnimatePresence>
 
-                {/* Navigation controls */}
                 {promos.length > 1 && (
                   <div className="flex items-center justify-center gap-3 mt-8">
                     <button
@@ -846,7 +751,6 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
               <motion.div key={item.id} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.15 }}>
                 <Card className="premium-card border-blush/30 overflow-hidden group">
                   <div className="grid grid-cols-2 relative">
-                    {/* Before */}
                     <div className="relative aspect-square overflow-hidden">
                       <Image
                         src={item.beforeImg}
@@ -861,7 +765,6 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
                         </span>
                       </div>
                     </div>
-                    {/* After */}
                     <div className="relative aspect-square overflow-hidden">
                       <Image
                         src={item.afterImg}
@@ -872,12 +775,10 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
                       />
                       <div className="absolute top-2 right-2">
                         <span className="inline-flex items-center gap-1 bg-gold/90 backdrop-blur-sm text-white text-[10px] font-semibold px-2 py-1 rounded-full uppercase tracking-wider">
-                          <Sparkles className="w-2.5 h-2.5" />
                           After
                         </span>
                       </div>
                     </div>
-                    {/* Divider line */}
                     <div className="absolute left-1/2 top-0 bottom-0 w-px bg-white/60 z-10">
                       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white shadow-md flex items-center justify-center">
                         <ArrowRight className="w-3 h-3 text-gold" />
@@ -910,7 +811,7 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
           </motion.div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {[
-              { icon: Leaf, title: 'Natural Ingredients', desc: 'Made with carefully sourced natural ingredients for gentle, effective results.' },
+              { icon: Shield, title: 'Natural Ingredients', desc: 'Made with carefully sourced natural ingredients for gentle, effective results.' },
               { icon: Shield, title: 'Dermatologist Tested', desc: 'All products are rigorously tested and approved by skincare professionals.' },
               { icon: Heart, title: 'Cruelty Free', desc: 'We never test on animals. Beauty without cruelty is our promise.' },
               { icon: Award, title: 'Premium Quality', desc: 'Only the finest ingredients and formulations make it into our products.' },
@@ -980,7 +881,7 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
           </motion.div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
             {displayInspiration.map((item, i) => {
-              const IconComp = iconMap[item.icon] || Sparkles
+              const IconComp = iconMap[item.icon] || Sun
               return (
               <motion.div
                 key={item.id}
@@ -996,18 +897,15 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
                   sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 250px"
                   className="object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
                 />
-                {/* Always-visible label tag */}
                 <div className="absolute top-3 left-3">
                   <span className="inline-flex items-center gap-1 bg-white/90 backdrop-blur-sm text-[10px] font-bold px-2.5 py-1 rounded-full text-foreground shadow-sm">
                     <IconComp className="w-3 h-3 text-gold" />
                     {item.label}
                   </span>
                 </div>
-                {/* Hover overlay with beauty tip */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-end p-4">
                   <p className="text-white text-xs sm:text-sm font-medium text-center leading-relaxed">{item.tip}</p>
                 </div>
-                {/* Bottom gradient accent */}
                 <div className={`absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r ${item.color} to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
               </motion.div>
               )
@@ -1049,9 +947,8 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
         </div>
       </section>
 
-      {/* Trusted By Partners — Motion Text Graphics */}
+      {/* Trusted By Partners */}
       <section className="partner-motion-section overflow-hidden">
-        {/* Decorative top label */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -1060,13 +957,10 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
           className="text-center pt-10 pb-6 relative z-10"
         >
           <span className="partner-section-label">
-            <Sparkles className="w-3 h-3" />
             Trusted By Industry Leaders
-            <Sparkles className="w-3 h-3" />
           </span>
         </motion.div>
 
-        {/* Row 1 — scrolling left */}
         <div className="partner-motion-marquee">
           <div className="partner-motion-track partner-motion-track-left">
             {[...displayPartners, ...displayPartners, ...displayPartners, ...displayPartners].map((partner, i) => (
@@ -1088,7 +982,6 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
           </div>
         </div>
 
-        {/* Row 2 — scrolling right (reverse) */}
         <div className="partner-motion-marquee mt-4">
           <div className="partner-motion-track partner-motion-track-right">
             {[...displayPartners.slice().reverse(), ...displayPartners.slice().reverse(), ...displayPartners.slice().reverse(), ...displayPartners.slice().reverse()].map((partner, i) => (
@@ -1110,7 +1003,6 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
           </div>
         </div>
 
-        {/* Bottom fade overlay */}
         <div className="partner-motion-bottom-fade" />
       </section>
     </div>

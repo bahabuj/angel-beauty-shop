@@ -128,12 +128,12 @@ export default function Navbar() {
                 <button
                   onClick={handleMobileLogoClick}
                   className="p-6 border-b border-blush/30 w-full text-left select-none"
-                  aria-label="Angelsbeauty home"
+                  aria-label="Angles Beauty home"
                 >
                   <div className="flex items-center gap-2">
                     <Image
                       src="/images/logo.png"
-                      alt="Angelsbeauty"
+                      alt="Angles Beauty"
                       width={40}
                       height={40}
                       className="object-contain"
@@ -142,7 +142,7 @@ export default function Navbar() {
                       className="font-playfair text-2xl font-bold gold-gradient-text"
                       style={{ fontFamily: 'var(--font-playfair), serif' }}
                     >
-                      Angelsbeauty
+                      Angles Beauty
                     </h2>
                   </div>
                 </button>
@@ -219,11 +219,11 @@ export default function Navbar() {
           <button
             onClick={handleLogoClick}
             className="flex items-center gap-2 group select-none"
-            aria-label="Angelsbeauty home"
+            aria-label="Angles Beauty home"
           >
             <Image
               src="/images/logo.png"
-              alt="Angelsbeauty"
+              alt="Angles Beauty"
               width={40}
               height={40}
               className="object-contain"
@@ -232,7 +232,7 @@ export default function Navbar() {
               className="text-xl font-bold gold-gradient-text hidden sm:block"
               style={{ fontFamily: 'var(--font-playfair), serif' }}
             >
-              Angelsbeauty
+              Angles Beauty
             </span>
           </button>
 

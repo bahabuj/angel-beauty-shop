@@ -552,50 +552,7 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
               </motion.div>
             </motion.div>
 
-            {/* Right side - floating product showcase card */}
-            <motion.div
-              initial={{ opacity: 0, x: 40 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8, delay: 0.4 }}
-              className="relative hidden lg:block"
-            >
-              <div className="relative w-full aspect-square max-w-lg mx-auto">
-                <div className="absolute inset-4 rounded-3xl bg-gradient-to-br from-white/15 via-white/5 to-transparent rotate-6 backdrop-blur-sm border border-white/10" />
-                <div className="absolute inset-4 rounded-3xl bg-gradient-to-br from-white/10 via-white/5 to-transparent -rotate-3 overflow-hidden backdrop-blur-sm border border-white/10">
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="text-center">
-                      <motion.div
-                        className="w-32 h-32 mx-auto mb-4 rounded-full bg-gradient-to-br from-gold/30 to-rose/30 flex items-center justify-center backdrop-blur-sm border border-white/20"
-                        animate={{ scale: [1, 1.05, 1] }}
-                        transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-                      >
-                        <Sparkles className="w-16 h-16 text-gold-light" />
-                      </motion.div>
-                      <p className="text-lg font-medium text-white" style={{ fontFamily: 'var(--font-playfair), serif' }}>
-                        Angel Beauty
-                      </p>
-                      <p className="text-sm text-white/60 mt-1">Premium Skincare</p>
-                    </div>
-                  </div>
-                </div>
-                <motion.div
-                  className="absolute -bottom-4 -right-4 w-24 h-24 rounded-2xl bg-white/10 flex items-center justify-center backdrop-blur-sm border border-white/15"
-                  animate={{ y: [0, -8, 0] }}
-                  transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-                >
-                  <Leaf className="w-10 h-10 text-gold-light" />
-                </motion.div>
-                <motion.div
-                  className="absolute -top-4 -left-4 w-20 h-20 rounded-full bg-white/10 flex items-center justify-center backdrop-blur-sm border border-white/15"
-                  animate={{ y: [0, -8, 0] }}
-                  transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut', delay: 1.5 }}
-                >
-                  <Droplets className="w-8 h-8 text-rose-light" />
-                </motion.div>
-              </div>
-            </motion.div>
-          </div>
-        </div>
+            
       </section>
 
       {/* Featured Products */}

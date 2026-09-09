@@ -16,40 +16,38 @@ async function main() {
   })
 
   const categories = [
-    { name: 'Skincare Sets', slug: 'skincare-sets', description: 'Curated skincare routines and value bundles' },
-    { name: 'Face & Body Creams', slug: 'face-body-creams', description: 'Nourishing creams for radiant skin from head to toe' },
-    { name: 'Body Care', slug: 'body-care', description: 'Premium body care products for smooth, hydrated skin' },
-    { name: 'Facial Care', slug: 'facial-care', description: 'Targeted facial care essentials and treatments' },
-    { name: 'Soaps & Cleansers', slug: 'soaps-cleansers', description: 'Deep cleansing bars and complexion-focused cleansers' },
-    { name: 'Serums & Treatments', slug: 'serums-treatments', description: 'Potent serums and treatment formulas for visible results' },
-    { name: 'Face Masks & Scrubs', slug: 'face-masks-scrubs', description: 'Exfoliating and glow-boosting masks and scrubs' },
-    { name: 'Sun Protection', slug: 'sun-protection', description: 'Daily SPF protection for healthy, protected skin' },
-    { name: 'Turmeric Collection', slug: 'turmeric-collection', description: 'Golden turmeric-infused products for brightening and renewal' },
-    { name: 'Cleansers', slug: 'cleansers', description: 'Gentle cleansers for radiant skin' },
-    { name: 'Moisturizers', slug: 'moisturizers', description: 'Hydrating moisturizers for all skin types' },
-    { name: 'Serums', slug: 'serums', description: 'Powerful serums for targeted skincare' },
-    { name: 'Face Masks', slug: 'face-masks', description: 'Luxurious face masks for deep treatment' },
-    { name: 'Lip Care', slug: 'lip-care', description: 'Soft and supple lip care essentials' },
-    { name: 'Gift Sets', slug: 'gift-sets', description: 'Beautifully curated gift sets' },
-    { name: 'Accessories', slug: 'accessories', description: 'Skincare tools and accessories' },
-    { name: 'Whitening Products', slug: 'whitening-products', description: 'Brightening and whitening skincare products' },
-    { name: 'Vagina Care', slug: 'vagina-care', description: 'Intimate care products for vaginal health' },
-    { name: 'Tea', slug: 'tea', description: 'Herbal and wellness teas for beauty from within' },
-    { name: 'Skin Solutions', slug: 'skin-solutions', description: 'Specialized solutions for specific skin concerns' },
-    { name: 'Organic', slug: 'organic', description: '100% organic and natural skincare products' },
-    { name: 'Lipsticks', slug: 'lipsticks', description: 'Beautiful lip colors and finishes' },
-    { name: 'Foundation', slug: 'foundation', description: 'Flawless foundation for every skin tone' },
+    // Standard Categories
+    { name: 'Face Cream', slug: 'face-cream', description: 'Nourishing creams formulated specifically for delicate facial skin' },
+    { name: 'Lotion', slug: 'lotion', description: 'Hydrating daily body lotions for smooth and soft skin' },
+    { name: 'Scrubs', slug: 'scrubs', description: 'Exfoliating body and face scrubs for renewed complexion' },
+    { name: 'Soap and Cleansers', slug: 'soap-and-cleansers', description: 'Deep cleansing bars and gentle everyday cleansers' },
+    { name: 'Masks', slug: 'masks', description: 'Luxurious face and skin masks for deep treatment and hydration' },
+    { name: 'Body Oils', slug: 'body-oils', description: 'Nutrient-rich body oils for intense moisture and glow' },
+    { name: 'Serums', slug: 'serums', description: 'Potent treatment serums targeting specific skincare concerns' },
+    { name: 'Toners', slug: 'toners', description: 'Balancing and refreshing skin toners' },
+    { name: 'Sunscreen', slug: 'sunscreen', description: 'Broad-spectrum sun protection for daily defense' },
+
+    // Bundles
+    { name: 'Acne Bundle', slug: 'acne-bundle', description: 'Targeted multi-product sets designed to clarify and soothe acne-prone skin' },
+    { name: 'Brightening Glow', slug: 'brightening-glow', description: 'Complete routine sets for radiant and luminous skin' },
+    { name: 'Caramel Lush', slug: 'caramel-lush', description: 'Rich, warming complexion care bundles' },
+    { name: 'Lavishing Light', slug: 'lavishing-light', description: 'Illuminating skincare sets for a healthy glow' },
+    { name: 'Whitening Lust', slug: 'whitening-lust', description: 'Curated sets for evening out skin tone and hyperpigmentation' },
+    { name: 'Luxury Snow White', slug: 'luxury-snow-white', description: 'Premium brightening and skin-smoothing collections' },
+
+    // Collections
+    { name: 'Turmeric Glow Collection', slug: 'turmeric-glow-collection', description: 'Golden turmeric-infused essentials for natural skin renewal' },
   ]
 
   for (const cat of categories) {
-    await prisma.category.upsert({ where: { slug: cat.slug }, update: {}, create: cat })
+    await prisma.category.upsert({ where: { slug: cat.slug }, update: { name: cat.name, description: cat.description }, create: cat })
   }
 
   const products = [
     {
       name: 'Rose Petal Cleansing Oil', slug: 'rose-petal-cleansing-oil',
       description: 'A luxurious cleansing oil infused with rose petal extract that melts away makeup and impurities while leaving your skin soft and hydrated. This gentle formula transforms from oil to milk upon contact with water, providing a deep yet gentle cleanse.',
-      price: 55, comparePrice: 79, categorySlug: 'cleansers',
+      price: 55, comparePrice: 79, categorySlug: 'soap-and-cleansers',
       images: JSON.stringify(['/images/products/cleanser-1.jpg']),
       benefits: JSON.stringify(['Deeply cleanses without stripping moisture', 'Removes waterproof makeup', 'Leaves skin soft and supple', 'Suitable for all skin types']),
       ingredients: 'Rosa Damascena Flower Oil, Caprylic/Capric Triglyceride, PEG-20 Glyceryl Triisostearate, Prunus Amygdalus Dulcis Oil, Tocopherol',
@@ -59,7 +57,7 @@ async function main() {
     {
       name: 'Honey Glow Moisturizer', slug: 'honey-glow-moisturizer',
       description: 'An ultra-hydrating moisturizer enriched with raw honey and hyaluronic acid. This lightweight yet deeply nourishing formula locks in moisture for up to 72 hours, giving your skin a natural, radiant glow.',
-      price: 79, comparePrice: 99, categorySlug: 'moisturizers',
+      price: 79, comparePrice: 99, categorySlug: 'face-cream',
       images: JSON.stringify(['/images/products/moisturizer-1.jpg']),
       benefits: JSON.stringify(['72-hour hydration', 'Lightweight non-greasy formula', 'Plumps and firms skin', 'Natural radiant glow']),
       ingredients: 'Aqua, Honey Extract, Sodium Hyaluronate, Glycerin, Cetearyl Alcohol, Shea Butter, Niacinamide',
@@ -79,7 +77,7 @@ async function main() {
     {
       name: 'Lavender Dream Sleep Mask', slug: 'lavender-dream-sleep-mask',
       description: 'An overnight recovery mask infused with lavender essential oil and ceramides. Wake up to visibly softer, smoother, and more rejuvenated skin after just one use.',
-      price: 62, comparePrice: null, categorySlug: 'face-masks',
+      price: 62, comparePrice: null, categorySlug: 'masks',
       images: JSON.stringify(['/images/products/mask-1.jpg']),
       benefits: JSON.stringify(['Overnight skin recovery', 'Deep hydration while you sleep', 'Calms and soothes irritated skin', 'Relaxing lavender scent']),
       ingredients: 'Aqua, Lavandula Angustifolia Oil, Ceramide NP, Glycerin, Squalane, Panthenol',
@@ -89,7 +87,7 @@ async function main() {
     {
       name: 'Shea Butter Body Lotion', slug: 'shea-butter-body-lotion',
       description: 'A rich and creamy body lotion formulated with raw shea butter and coconut oil. This ultra-nourishing formula absorbs quickly to leave your entire body feeling soft, smooth, and beautifully scented.',
-      price: 42, comparePrice: 55, categorySlug: 'body-care',
+      price: 42, comparePrice: 55, categorySlug: 'lotion',
       images: JSON.stringify(['/images/products/body-1.jpg']),
       benefits: JSON.stringify(['24-hour moisture', 'Non-greasy fast absorption', 'Improves skin elasticity', 'Suitable for sensitive skin']),
       ingredients: 'Aqua, Butyrospermum Parkii Butter, Cocos Nucifera Oil, Glycerin, Cetearyl Alcohol, Tocopherol',
@@ -99,7 +97,7 @@ async function main() {
     {
       name: 'Rose Lip Treatment Oil', slug: 'rose-lip-treatment-oil',
       description: 'A luxurious lip treatment oil infused with rosehip oil and vitamin E. This non-sticky formula deeply nourishes, repairs, and protects dry, chapped lips while giving a beautiful subtle rose tint.',
-      price: 29, comparePrice: null, categorySlug: 'lip-care',
+      price: 29, comparePrice: null, categorySlug: 'body-oils',
       images: JSON.stringify(['/images/products/lip-1.jpg']),
       benefits: JSON.stringify(['Deeply nourishes dry lips', 'Natural rose tint', 'Non-sticky formula', 'Protects against environmental damage']),
       ingredients: 'Rosa Canina Fruit Oil, Castor Oil, Vitamin E, Jojoba Oil, Beeswax',
@@ -109,7 +107,7 @@ async function main() {
     {
       name: 'Radiance Gift Set', slug: 'radiance-gift-set',
       description: 'The perfect gift for someone special. This beautifully curated set includes our best-selling Vitamin C Serum, Honey Glow Moisturizer, and Rose Petal Cleanser in a luxurious gift box.',
-      price: 185, comparePrice: 229, categorySlug: 'gift-sets',
+      price: 185, comparePrice: 229, categorySlug: 'brightening-glow',
       images: JSON.stringify(['/images/products/gift-1.jpg']),
       benefits: JSON.stringify(['Complete skincare routine', 'Premium gift packaging', 'Save 21% vs buying individually', 'Includes best-sellers']),
       ingredients: 'See individual products for full ingredient lists',
@@ -119,7 +117,7 @@ async function main() {
     {
       name: 'Jade Facial Roller', slug: 'jade-facial-roller',
       description: 'A premium jade facial roller designed to reduce puffiness, improve circulation, and enhance product absorption. This beauty tool is a must-have for your daily skincare routine.',
-      price: 49, comparePrice: 69, categorySlug: 'accessories',
+      price: 49, comparePrice: 69, categorySlug: 'scrubs',
       images: JSON.stringify(['/images/products/roller-1.jpg']),
       benefits: JSON.stringify(['Reduces facial puffiness', 'Improves blood circulation', 'Enhances product absorption', 'Promotes lymphatic drainage']),
       ingredients: 'Natural Jade Stone, Metal Handle',
@@ -129,7 +127,7 @@ async function main() {
     {
       name: 'Aloe Vera Gentle Cleanser', slug: 'aloe-vera-gentle-cleanser',
       description: 'A soothing gel cleanser enriched with pure aloe vera extract. Perfect for sensitive and acne-prone skin.',
-      price: 35, comparePrice: 45, categorySlug: 'cleansers',
+      price: 35, comparePrice: 45, categorySlug: 'soap-and-cleansers',
       images: JSON.stringify(['/images/products/cleanser-2.jpg']),
       benefits: JSON.stringify(['Gentle on sensitive skin', 'Soothes irritation and redness', 'Deep pore cleansing', 'Anti-inflammatory properties']),
       ingredients: 'Aqua, Aloe Barbadensis Leaf Juice, Cocamidopropyl Betaine, Glycerin, Panthenol',
@@ -139,7 +137,7 @@ async function main() {
     {
       name: 'Retinol Night Repair Cream', slug: 'retinol-night-repair-cream',
       description: 'An advanced night cream formulated with encapsulated retinol and peptides. Works while you sleep to reduce fine lines and improve skin texture.',
-      price: 119, comparePrice: 149, categorySlug: 'moisturizers',
+      price: 119, comparePrice: 149, categorySlug: 'face-cream',
       images: JSON.stringify(['/images/products/night-cream-1.jpg']),
       benefits: JSON.stringify(['Reduces fine lines and wrinkles', 'Improves skin texture', 'Boosts collagen production', 'Visible results in 4 weeks']),
       ingredients: 'Aqua, Retinol (0.3%), Palmitoyl Tripeptide-1, Glycerin, Squalane, Shea Butter',
@@ -159,7 +157,7 @@ async function main() {
     {
       name: 'Charcoal Detox Mask', slug: 'charcoal-detox-mask',
       description: 'A purifying clay mask infused with activated charcoal and kaolin clay. Draws out impurities, unclogs pores, and controls excess oil.',
-      price: 45, comparePrice: 59, categorySlug: 'face-masks',
+      price: 45, comparePrice: 59, categorySlug: 'masks',
       images: JSON.stringify(['/images/products/charcoal-mask-1.jpg']),
       benefits: JSON.stringify(['Deep pore cleansing', 'Controls excess oil', 'Draws out impurities', 'Mattifies shiny skin']),
       ingredients: 'Aqua, Kaolin, Activated Charcoal, Bentonite, Aloe Vera, Tea Tree Oil',

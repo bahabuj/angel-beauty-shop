@@ -142,15 +142,20 @@ export default function ShopPage() {
   }, [categories])
 
   const categoryColors: Record<string, string> = {
+    'skincare-sets': 'bg-violet-100 text-violet-700',
     'face-body-creams': 'bg-amber-100 text-amber-700',
-    'skincare-sets': 'bg-purple-100 text-purple-700',
+    'body-care': 'bg-orange-100 text-orange-700',
+    'facial-care': 'bg-pink-100 text-pink-700',
+    'soaps-cleansers': 'bg-teal-100 text-teal-700',
+    'serums-treatments': 'bg-purple-100 text-purple-700',
+    'face-masks-scrubs': 'bg-green-100 text-green-700',
+    'sun-protection': 'bg-blue-100 text-blue-700',
     'turmeric-collection': 'bg-yellow-100 text-yellow-700',
     'beauty-soaps': 'bg-teal-100 text-teal-700',
     cleansers: 'bg-blue-100 text-blue-700',
     moisturizers: 'bg-pink-100 text-pink-700',
     serums: 'bg-purple-100 text-purple-700',
     'face-masks': 'bg-green-100 text-green-700',
-    'body-care': 'bg-orange-100 text-orange-700',
     'lip-care': 'bg-rose-100 text-rose-700',
     'gift-sets': 'bg-gold/20 text-gold',
     accessories: 'bg-gray-100 text-gray-700',

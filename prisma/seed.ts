@@ -16,11 +16,19 @@ async function main() {
   })
 
   const categories = [
+    { name: 'Skincare Sets', slug: 'skincare-sets', description: 'Curated skincare routines and value bundles' },
+    { name: 'Face & Body Creams', slug: 'face-body-creams', description: 'Nourishing creams for radiant skin from head to toe' },
+    { name: 'Body Care', slug: 'body-care', description: 'Premium body care products for smooth, hydrated skin' },
+    { name: 'Facial Care', slug: 'facial-care', description: 'Targeted facial care essentials and treatments' },
+    { name: 'Soaps & Cleansers', slug: 'soaps-cleansers', description: 'Deep cleansing bars and complexion-focused cleansers' },
+    { name: 'Serums & Treatments', slug: 'serums-treatments', description: 'Potent serums and treatment formulas for visible results' },
+    { name: 'Face Masks & Scrubs', slug: 'face-masks-scrubs', description: 'Exfoliating and glow-boosting masks and scrubs' },
+    { name: 'Sun Protection', slug: 'sun-protection', description: 'Daily SPF protection for healthy, protected skin' },
+    { name: 'Turmeric Collection', slug: 'turmeric-collection', description: 'Golden turmeric-infused products for brightening and renewal' },
     { name: 'Cleansers', slug: 'cleansers', description: 'Gentle cleansers for radiant skin' },
     { name: 'Moisturizers', slug: 'moisturizers', description: 'Hydrating moisturizers for all skin types' },
     { name: 'Serums', slug: 'serums', description: 'Powerful serums for targeted skincare' },
     { name: 'Face Masks', slug: 'face-masks', description: 'Luxurious face masks for deep treatment' },
-    { name: 'Body Care', slug: 'body-care', description: 'Premium body care products' },
     { name: 'Lip Care', slug: 'lip-care', description: 'Soft and supple lip care essentials' },
     { name: 'Gift Sets', slug: 'gift-sets', description: 'Beautifully curated gift sets' },
     { name: 'Accessories', slug: 'accessories', description: 'Skincare tools and accessories' },

@@ -88,6 +88,11 @@ export default function Navbar() {
     { label: 'Contact', page: 'contact' as const },
   ]
 
+  const handleSearchClick = () => {
+    setSelectedCategory('all')
+    navigate('shop')
+  }
+
   return (
     <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-blush/50">
       {/* Premium Animated Announcement Bar */}
@@ -151,7 +156,11 @@ export default function Navbar() {
                     link.page === 'shop' ? (
                       <div key={link.page}>
                         <button
-                          onClick={() => { navigate('shop'); setMobileMenuOpen(false) }}
+                          onClick={() => { 
+                            setSelectedCategory('all')
+                            navigate('shop')
+                            setMobileMenuOpen(false) 
+                          }}
                           className={`w-full text-left px-6 py-3 text-sm font-medium transition-colors hover:bg-blush/30 ${
                             currentPage === link.page ? 'text-gold bg-blush/20' : 'text-foreground'
                           }`}
@@ -247,7 +256,10 @@ export default function Navbar() {
                   onMouseLeave={() => setShopDropdownOpen(false)}
                 >
                   <button
-                    onClick={() => navigate('shop')}
+                    onClick={() => {
+                      setSelectedCategory('all')
+                      navigate('shop')
+                    }}
                     className={`text-sm font-medium transition-all duration-200 relative py-1 flex items-center gap-1 ${
                       currentPage === link.page
                         ? 'text-gold'
@@ -263,7 +275,11 @@ export default function Navbar() {
                   {shopDropdownOpen && navCategories.length > 0 && (
                     <div className="absolute top-full left-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-blush/30 py-2 z-50">
                       <button
-                        onClick={() => { navigate('shop'); setShopDropdownOpen(false) }}
+                        onClick={() => { 
+                          setSelectedCategory('all')
+                          navigate('shop')
+                          setShopDropdownOpen(false) 
+                        }}
                         className="w-full text-left px-4 py-2 text-sm font-medium text-gold hover:bg-blush/20 transition-colors"
                       >
                         All Products
@@ -310,7 +326,8 @@ export default function Navbar() {
               variant="ghost"
               size="icon"
               className="text-foreground/70 hover:text-gold hidden sm:flex"
-              onClick={() => navigate('shop')}
+              onClick={handleSearchClick}
+              aria-label="Search products"
             >
               <Search className="h-5 w-5" />
             </Button>
@@ -319,6 +336,11 @@ export default function Navbar() {
               variant="ghost"
               size="icon"
               className="text-foreground/70 hover:text-gold hidden sm:flex"
+              onClick={() => {
+                setSelectedCategory('all')
+                navigate('shop')
+              }}
+              aria-label="View favorites"
             >
               <Heart className="h-5 w-5" />
             </Button>

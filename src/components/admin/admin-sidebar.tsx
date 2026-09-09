@@ -64,7 +64,7 @@ function SidebarContent({
           </div>
           <div>
             <h1 className="text-lg font-bold tracking-tight text-foreground">
-              Angel Beauty
+              Angels Beauty
             </h1>
             <p className="text-xs font-medium text-muted-foreground">
               Admin Panel

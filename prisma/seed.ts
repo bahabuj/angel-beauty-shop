@@ -36,7 +36,7 @@ async function main() {
     { name: 'Luxury Snow White', slug: 'luxury-snow-white', description: 'Premium brightening and skin-smoothing collections' },
 
     // Collections
-    { name: 'Turmeric Glow Collection', slug: 'turmeric-glow-collection', description: 'Golden turmeric-infused essentials for natural skin renewal' },
+    { name: 'Tumeric Glow Collection', slug: 'turmeric-glow-collection', description: 'Golden turmeric-infused essentials for natural skin renewal' },
   ]
 
   for (const cat of categories) {

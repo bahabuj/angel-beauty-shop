@@ -128,21 +128,21 @@ export default function Navbar() {
                 <button
                   onClick={handleMobileLogoClick}
                   className="p-6 border-b border-blush/30 w-full text-left select-none"
-                  aria-label="Angles Beauty home"
+                  aria-label="Angels Beauty home"
                 >
                   <div className="flex items-center gap-2">
                     <Image
                       src="/images/logo.png"
-                      alt="Angles Beauty"
+                      alt="Angels Beauty"
                       width={40}
                       height={40}
                       className="object-contain"
                     />
                     <h2
-                      className="font-playfair text-2xl font-bold gold-gradient-text"
+                      className="font-playfair text-3xl font-extrabold gold-gradient-text"
                       style={{ fontFamily: 'var(--font-playfair), serif' }}
                     >
-                      Angles Beauty
+                      Angels Beauty
                     </h2>
                   </div>
                 </button>
@@ -219,20 +219,20 @@ export default function Navbar() {
           <button
             onClick={handleLogoClick}
             className="flex items-center gap-2 group select-none"
-            aria-label="Angles Beauty home"
+            aria-label="Angels Beauty home"
           >
             <Image
               src="/images/logo.png"
-              alt="Angles Beauty"
+              alt="Angels Beauty"
               width={40}
               height={40}
               className="object-contain"
             />
             <span
-              className="text-xl font-bold gold-gradient-text hidden sm:block"
+              className="text-2xl sm:text-3xl font-extrabold gold-gradient-text hidden sm:block"
               style={{ fontFamily: 'var(--font-playfair), serif' }}
             >
-              Angles Beauty
+              Angels Beauty
             </span>
           </button>
 

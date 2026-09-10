@@ -48,6 +48,13 @@ export async function middleware(request: NextRequest) {
       pathname === '/api/auth-slides' ||
       pathname === '/api/auth-slides-all' ||
       pathname.startsWith('/api/auth-slides/') ||
+      pathname === '/api/shipping-zones' ||
+      pathname.startsWith('/api/shipping-zones/') ||
+      pathname === '/api/promotions' ||
+      pathname.startsWith('/api/promotions/') ||
+      pathname === '/api/ad-videos' ||
+      pathname.startsWith('/api/ad-videos/') ||
+      pathname.startsWith('/api/user/') ||
       pathname === '/api/home-data'
     )
 
@@ -61,6 +68,8 @@ export async function middleware(request: NextRequest) {
       pathname === '/api/clover/return' ||      // Clover redirect
       pathname === '/api/clover/checkout-status' || // customers poll status
       pathname === '/api/clover/webhook' ||     // Clover webhook (verified by signature)
+      pathname === '/api/promotions/validate' ||// customers validate coupon codes
+      pathname.startsWith('/api/user/avatar') ||// customers upload avatar
       // Server-to-server call: invoice auto-generation triggered after order
       // placement (/api/orders), payment success (/api/clover/return), and
       // webhook events (/api/clover/webhook). These background fetches have no
@@ -97,7 +106,13 @@ export async function middleware(request: NextRequest) {
       pathname === '/api/announcement-items' ||
       pathname.startsWith('/api/announcement-items/') ||
       pathname === '/api/auth-slides' ||
-      pathname.startsWith('/api/auth-slides/')
+      pathname.startsWith('/api/auth-slides/') ||
+      pathname === '/api/shipping-zones' ||
+      pathname.startsWith('/api/shipping-zones/') ||
+      pathname === '/api/promotions' ||
+      pathname.startsWith('/api/promotions/') ||
+      pathname === '/api/ad-videos' ||
+      pathname.startsWith('/api/ad-videos/')
     )
 
   if (isAdminResourceMutation) {

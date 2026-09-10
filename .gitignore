@@ -83,3 +83,6 @@ db/custom.db.pre-restore.bak
 # Static download assets (large files copied from backup — NEVER commit)
 # These are served from /downloads/ via Next.js static file serving
 public/downloads/
+
+# Customer invoices (contain PII — never commit)
+public/invoices/

@@ -22,6 +22,7 @@ import {
   Check,
   Sun,
   Instagram,
+  PlayCircle,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import PaymentShowcaseSection from '@/components/checkout/payment-showcase'
@@ -82,6 +83,7 @@ interface HeroSlideData { id: string; mediaUrl: string; mediaType: string; overl
 interface PartnerData { id: string; name: string; logo: string; url: string | null }
 interface TransformationData { id: string; name: string; duration: string; result: string; beforeImg: string; afterImg: string; active: boolean; order: number }
 interface InspirationData { id: string; label: string; tip: string; image: string; icon: string; color: string; active: boolean; order: number }
+interface AdVideoData { id: string; title: string; description: string | null; videoUrl: string; posterImage: string | null; productSlug: string | null; duration: string; active: boolean; order: number }
 
 interface HomePageProps {
   initialData?: HomeData | null
@@ -118,6 +120,8 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
   const [inspirationItems, setInspirationItems] = useState<InspirationData[]>(
     (initialData?.inspirationItems as InspirationData[]) || []
   )
+  const [adVideos, setAdVideos] = useState<AdVideoData[]>([])
+  const [activeVideoIdx, setActiveVideoIdx] = useState(0)
   const hasInitialData = !!(initialData && (initialData.featured?.length || initialData.heroSlides?.length))
 
   const DEFAULT_TRANSFORMATIONS: TransformationData[] = [
@@ -200,6 +204,19 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
     }
     loadData()
   }, [hasInitialData])
+
+  // Fetch ad videos (separate endpoint, not part of /api/home-data)
+  useEffect(() => {
+    fetch('/api/ad-videos')
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data?.success && Array.isArray(data.videos)) {
+          const active = data.videos.filter((v: AdVideoData) => v.active)
+          if (active.length > 0) setAdVideos(active)
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (promos.length <= 1) return
@@ -813,8 +830,8 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
             {[
               { name: 'Chioma A.', text: 'The Vitamin C Serum completely transformed my skin! My dark spots are fading and my skin glows like never before.', rating: 5 },
-              { name: 'Amara O.', text: 'I love the Honey Glow Moisturizer. It keeps my skin hydrated all day without feeling greasy. Absolute game changer!', rating: 5 },
-              { name: 'Fatima B.', text: 'The Rose Petal Cleansing Oil is divine! It removes all my makeup effortlessly and leaves my skin so soft.', rating: 5 },
+              { name: 'Amara O.', text: 'My skin has never looked better. The products feel luxurious and the results are real.', rating: 5 },
+              { name: 'Fatima B.', text: 'Effortless shopping, premium quality, and fast delivery. I am a customer for life!', rating: 5 },
             ].map((review, i) => (
               <motion.div key={i} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.15 }}>
                 <Card className="premium-card border-blush/30 p-6">
@@ -837,62 +854,129 @@ export default function HomePage({ initialData }: HomePageProps = {}) {
         </div>
       </section>
 
-      {/* Instagram-style Beauty Feed Section */}
-      <section className="py-16 sm:py-20 bg-gradient-to-b from-cream/50 to-transparent">
-        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div {...fadeInUp} className="text-center mb-10">
-            <div className="inline-flex items-center gap-2 mb-3">
-              <Instagram className="w-5 h-5 text-gold" />
-              <span className="text-sm font-semibold tracking-wider uppercase text-gold">@angelbeauty</span>
-            </div>
-            <h2 className="text-3xl font-bold mb-3" style={{ fontFamily: 'var(--font-playfair), serif' }}>
-              Beauty Inspiration Daily
-            </h2>
-            <p className="text-muted-foreground max-w-md mx-auto">Follow us for skincare tips, product reveals & exclusive offers</p>
-          </motion.div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-            {displayInspiration.map((item, i) => {
-              const IconComp = iconMap[item.icon] || Sun
-              return (
-                <motion.div
-                  key={item.id}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.4, delay: i * 0.05 }}
-                  className="aspect-square rounded-2xl overflow-hidden group cursor-pointer relative"
-                >
-                  <Image
-                    src={item.image}
-                    alt={item.label}
-                    fill
-                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 250px"
-                    className="object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+      {/* ─── Product Ad Videos Section (replaces Instagram Inspiration) ──── */}
+      {adVideos.length > 0 && (
+        <section className="py-16 sm:py-20 bg-gradient-to-b from-cream/50 to-transparent">
+          <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
+            <motion.div {...fadeInUp} className="text-center mb-10">
+              <div className="inline-flex items-center gap-2 mb-3">
+                <PlayCircle className="w-5 h-5 text-gold" />
+                <span className="text-sm font-semibold tracking-wider uppercase text-gold">Watch & Discover</span>
+              </div>
+              <h2 className="text-3xl font-bold mb-3" style={{ fontFamily: 'var(--font-playfair), serif' }}>
+                Product Ad Videos
+              </h2>
+              <p className="text-muted-foreground max-w-md mx-auto">
+                See our products in action — real demos, real results, real beauty.
+              </p>
+            </motion.div>
+
+            {/* Main featured video player + thumbnail strip */}
+            <div className="grid lg:grid-cols-3 gap-6">
+              {/* Main player */}
+              <div className="lg:col-span-2">
+                <div className="relative aspect-video rounded-2xl overflow-hidden bg-black shadow-xl">
+                  <video
+                    key={adVideos[activeVideoIdx]?.id}
+                    src={adVideos[activeVideoIdx]?.videoUrl}
+                    poster={adVideos[activeVideoIdx]?.posterImage || undefined}
+                    controls
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    className="w-full h-full object-contain bg-black"
                   />
-                  <div className="absolute top-3 left-3">
-                    <span className="inline-flex items-center gap-1 bg-white/90 backdrop-blur-sm text-[10px] font-bold px-2.5 py-1 rounded-full text-foreground shadow-sm">
-                      <IconComp className="w-3 h-3 text-gold" />
-                      {item.label}
-                    </span>
-                  </div>
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-end p-4">
-                    <p className="text-white text-xs sm:text-sm font-medium text-center leading-relaxed">{item.tip}</p>
-                  </div>
-                  <div className={`absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r ${item.color} to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
-                </motion.div>
-              )
-            })}
+                  {adVideos[activeVideoIdx]?.duration && (
+                    <div className="absolute top-3 right-3">
+                      <Badge className="bg-black/70 text-white text-[10px]">
+                        {adVideos[activeVideoIdx].duration}
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+                {/* Title + description */}
+                <div className="mt-4">
+                  <h3 className="text-lg font-bold" style={{ fontFamily: 'var(--font-playfair), serif' }}>
+                    {adVideos[activeVideoIdx]?.title}
+                  </h3>
+                  {adVideos[activeVideoIdx]?.description && (
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {adVideos[activeVideoIdx].description}
+                    </p>
+                  )}
+                  {adVideos[activeVideoIdx]?.productSlug && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-3 border-gold/40 text-gold hover:bg-gold hover:text-white"
+                      onClick={() => navigate('product', { slug: adVideos[activeVideoIdx].productSlug! })}
+                    >
+                      <ShoppingBag className="w-3.5 h-3.5 mr-1.5" />
+                      Shop This Product
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {/* Thumbnail playlist */}
+              <div className="lg:col-span-1">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                  Up Next ({adVideos.length})
+                </p>
+                <div
+                  className="space-y-2 max-h-[480px] overflow-y-auto pr-1
+                             [&::-webkit-scrollbar]:w-1.5
+                             [&::-webkit-scrollbar-thumb]:rounded-full
+                             [&::-webkit-scrollbar-thumb]:bg-blush/40
+                             hover:[&::-webkit-scrollbar-thumb]:bg-blush/70
+                             [&::-webkit-scrollbar-track]:bg-transparent"
+                >
+                  {adVideos.map((v, i) => (
+                    <button
+                      key={v.id}
+                      onClick={() => setActiveVideoIdx(i)}
+                      className={`flex items-center gap-3 w-full text-left p-2 rounded-lg transition-colors ${
+                        i === activeVideoIdx
+                          ? 'bg-gold/10 ring-1 ring-gold/30'
+                          : 'hover:bg-blush/30'
+                      }`}
+                    >
+                      <div className="relative w-24 h-14 rounded overflow-hidden bg-black shrink-0">
+                        {v.posterImage ? (
+                          <img
+                            src={v.posterImage}
+                            alt={v.title}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <video
+                            src={v.videoUrl}
+                            className="w-full h-full object-cover"
+                            preload="metadata"
+                            muted
+                          />
+                        )}
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                          <PlayCircle className="w-5 h-5 text-white/90" fill="currentColor" />
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-xs font-medium line-clamp-2 ${i === activeVideoIdx ? 'text-gold' : 'text-foreground'}`}>
+                          {v.title}
+                        </p>
+                        {v.duration && (
+                          <p className="text-[10px] text-muted-foreground mt-0.5">{v.duration}</p>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="text-center mt-8">
-            <Button
-              variant="outline"
-              className="border-gold/40 text-gold hover:bg-gold hover:text-white rounded-full px-8"
-              onClick={() => window.open('https://instagram.com/angelbeauty', '_blank')}
-            >
-              <Instagram className="w-4 h-4 mr-2" /> Follow Us on Instagram
-            </Button>
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Premium Payment Showcase */}
       <PaymentShowcaseSection />

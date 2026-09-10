@@ -87,6 +87,53 @@
   --sidebar-ring: #C9A96E;
 }
 
+/* ─── Dark mode (premium) ─────────────────────────────────────────────────── */
+.dark {
+  --radius: 0.75rem;
+  --background: #1A1517;
+  --foreground: #F5E6E0;
+  --card: #2A2326;
+  --card-foreground: #F5E6E0;
+  --popover: #2A2326;
+  --popover-foreground: #F5E6E0;
+  --primary: #D4BA8A;
+  --primary-foreground: #1A1517;
+  --secondary: #3D2C2E;
+  --secondary-foreground: #F5E6E0;
+  --muted: #2A2326;
+  --muted-foreground: #B8A8A6;
+  --accent: #3D2C2E;
+  --accent-foreground: #F5E6E0;
+  --destructive: #EF5C6E;
+  --border: #3D2C2E;
+  --input: #3D2C2E;
+  --ring: #D4BA8A;
+  --chart-1: #D4BA8A;
+  --chart-2: #D4838D;
+  --chart-3: #5A4A4C;
+  --chart-4: #B8A8A6;
+  --chart-5: #3D2C2E;
+  --sidebar: #221A1C;
+  --sidebar-foreground: #F5E6E0;
+  --sidebar-primary: #D4BA8A;
+  --sidebar-primary-foreground: #1A1517;
+  --sidebar-accent: #3D2C2E;
+  --sidebar-accent-foreground: #F5E6E0;
+  --sidebar-border: #3D2C2E;
+  --sidebar-ring: #D4BA8A;
+
+  /* Brand colors stay the same — they look great on dark */
+  --color-blush: #3D2C2E;
+  --color-blush-dark: #2A2326;
+  --color-cream: #2A2326;
+  --color-nude: #3D2C2E;
+  --color-gold: #D4BA8A;
+  --color-gold-light: #E0C9A0;
+  --color-rose: #D4838D;
+  --color-rose-light: #E8A5AD;
+  --color-rose-dark: #B86B75;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

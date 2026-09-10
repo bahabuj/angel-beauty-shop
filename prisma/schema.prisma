@@ -4,8 +4,8 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url               = env("DATABASE_URL")
-  directUrl         = env("DIRECT_URL")
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -20,6 +20,18 @@ model User {
   emailVerified DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+}
+
+// ─── Password Reset Tokens ──────────────────────────────────────────────────
+// Single-use tokens emailed to users when they click "Forgot password?".
+// Each token is valid for 1 hour, then auto-expires.
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
 }
 
 model Category {
@@ -80,6 +92,11 @@ model Order {
   userId          String?
   items           String   @default("[]")
   subtotal        Float
+  discount        Float    @default(0)
+  shippingRate    Float    @default(0)
+  shippingZoneCode String?
+  promotionId     String?
+  couponCode      String?
   total           Float
   status          String   @default("pending")
   customerName    String
@@ -203,4 +220,60 @@ model Setting {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+// ─── Shipping Zones ─────────────────────────────────────────────────────────
+// Admin-managed shipping rates per region. The checkout page reads these
+// to calculate shipping cost based on the customer's country/region.
+model ShippingZone {
+  id          String   @id @default(cuid())
+  name        String                         // "United States", "Africa", etc.
+  code        String   @unique               // "US", "CA", "AF", etc.
+  flag        String   @default("")          // emoji flag, e.g. "🇺🇸"
+  rate        Float                          // flat shipping rate in USD
+  estimatedDays String @default("")          // "3-5 business days"
+  active      Boolean  @default(true)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── Promotions / Coupons ───────────────────────────────────────────────────
+// Admin-managed discount codes. The checkout page validates a coupon code
+// against this table and applies the discount if all eligibility rules pass.
+model Promotion {
+  id                 String   @id @default(cuid())
+  name               String                          // "Black Friday 2026"
+  description        String?
+  type               String   @default("percentage") // "percentage" | "fixed" | "shipping"
+  discount           Float                            // percentage (0-100) or fixed USD amount
+  couponCode         String   @unique                // "BLACKFRI40"
+  minimumOrder       Float    @default(0)            // minimum subtotal in USD
+  eligibleProducts   String   @default("[]")         // JSON array of product IDs (empty = all)
+  eligibleCategories String   @default("[]")         // JSON array of category slugs (empty = all)
+  freeShipping       Boolean  @default(false)        // if true, shipping cost is waived
+  startDate          DateTime?
+  endDate            DateTime?
+  usageLimit         Int      @default(0)            // 0 = unlimited
+  usedCount          Int      @default(0)
+  status             String   @default("active")     // "active" | "scheduled" | "expired" | "disabled"
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+// ─── Ad Videos (replaces Inspiration Hub) ───────────────────────────────────
+// Product ad videos shown on the homepage. Admin uploads via Cloudinary
+// (or local disk fallback) and customers watch them inline.
+model AdVideo {
+  id          String   @id @default(cuid())
+  title       String                                // "Vitamin C Serum Demo"
+  description String?                               // optional caption
+  videoUrl    String                                // Cloudinary or /uploads/... URL
+  posterImage String?                               // optional thumbnail image URL
+  productSlug String?                               // optional link to a product
+  duration    String   @default("")                 // "0:45" — display only
+  active      Boolean  @default(true)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

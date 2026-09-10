@@ -17,6 +17,9 @@ import {
   Tag,
   Lightbulb,
   GitCompareArrows,
+  Truck,
+  Ticket,
+  Video,
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -39,10 +42,12 @@ const navItems = [
   { id: 'categories', label: 'Categories', icon: Tag },
   { id: 'orders', label: 'Orders', icon: ShoppingBag },
   { id: 'banners', label: 'Promo Banners', icon: Megaphone },
+  { id: 'promotions', label: 'Promotions', icon: Ticket },
+  { id: 'shipping', label: 'Shipping Management', icon: Truck },
+  { id: 'ad-videos', label: 'Ad Videos', icon: Video },
   { id: 'visual-content', label: 'Visual Content', icon: Palette },
   { id: 'auth-slides', label: 'Auth Page Slides', icon: ImagePlay },
   { id: 'before-after', label: 'Before & After Images', icon: GitCompareArrows },
-  { id: 'inspiration-hub', label: 'Inspiration Hub', icon: Lightbulb },
   { id: 'newsletter', label: 'Newsletter Subscribers', icon: Mail },
   { id: 'settings', label: 'Settings', icon: Settings },
 ]

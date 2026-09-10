@@ -8,16 +8,53 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { User, Mail, Phone, ShoppingBag, LogOut, Shield, Package } from 'lucide-react'
+import { User, Mail, Phone, ShoppingBag, LogOut, Shield, Package, Camera, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import UserAvatar from '@/components/layout/user-avatar'
 
 export default function AccountPage() {
-  const { user, isAuthenticated, logout } = useAuthStore()
+  const { user, isAuthenticated, logout, setUser } = useAuthStore()
   const navigate = useNavStore((s) => s.navigate)
   const itemCount = useCartStore((s) => s.items.reduce((sum, i) => sum + i.quantity, 0))
   const [orders, setOrders] = useState<any[]>([])
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [authChecking, setAuthChecking] = useState(true)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
+
+  // ── Re-verify auth with the server (the Zustand store may lag behind
+  // immediately after sign-in, causing a false "not authenticated" state) ──
+  useEffect(() => {
+    let cancelled = false
+    async function checkAuth() {
+      try {
+        const res = await fetch('/api/auth/me')
+        const data = await res.json()
+        if (!cancelled) {
+          if (data.authenticated && data.user) {
+            // Make sure the store is in sync
+            if (!isAuthenticated || !user) {
+              setUser({
+                id: data.user.id,
+                email: data.user.email,
+                name: data.user.name,
+                role: data.user.role,
+                phone: data.user.phone,
+                avatar: data.user.avatar,
+                image: data.user.image,
+              })
+            }
+          }
+          setAuthChecking(false)
+        }
+      } catch {
+        if (!cancelled) setAuthChecking(false)
+      }
+    }
+    checkAuth()
+    return () => { cancelled = true }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -26,6 +63,60 @@ export default function AccountPage() {
       })
     }
   }, [isAuthenticated, user])
+
+  // ── Avatar upload handler ─────────────────────────────────────────────────
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+    if (!allowed.includes(file.type)) {
+      toast.error('Please use JPG, PNG, WebP, or GIF.')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image exceeds 5MB limit.')
+      return
+    }
+
+    setUploadingAvatar(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch('/api/user/avatar', {
+        method: 'POST',
+        body: formData,
+      })
+      const data = await res.json()
+      if (data.success) {
+        setUser({
+          ...user!,
+          avatar: data.avatar,
+          image: data.avatar,
+        })
+        toast.success('Avatar updated!')
+      } else {
+        toast.error(data.error || 'Failed to upload avatar.')
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to upload avatar.')
+    } finally {
+      setUploadingAvatar(false)
+      if (avatarInputRef.current) avatarInputRef.current.value = ''
+    }
+  }
+
+  // ── Loading state while we verify auth with the server ────────────────────
+  if (authChecking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 text-gold animate-spin mx-auto mb-4" />
+          <p className="text-sm text-muted-foreground">Loading your account…</p>
+        </div>
+      </div>
+    )
+  }
 
   if (!isAuthenticated) {
     return (
@@ -61,11 +152,50 @@ export default function AccountPage() {
           <div>
             <Card className="border-blush/30">
               <CardContent className="p-6 text-center">
-                <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-gold/20 to-rose/20 flex items-center justify-center">
-                  <span className="text-2xl font-bold text-gold">{user?.name?.[0] || 'U'}</span>
+                {/* Avatar with upload-on-click */}
+                <div className="relative w-24 h-24 mx-auto mb-4 group">
+                  <button
+                    onClick={() => avatarInputRef.current?.click()}
+                    disabled={uploadingAvatar}
+                    className="block w-full h-full rounded-full focus:outline-none focus:ring-2 focus:ring-gold focus:ring-offset-2 ring-offset-background disabled:opacity-60"
+                    title="Click to upload avatar"
+                  >
+                    <UserAvatar
+                      name={user?.name}
+                      email={user?.email}
+                      avatar={user?.avatar}
+                      image={user?.image}
+                      size={96}
+                      ring
+                      className="w-full h-full"
+                    />
+                  </button>
+                  {/* Camera badge overlay */}
+                  <button
+                    type="button"
+                    onClick={() => !uploadingAvatar && avatarInputRef.current?.click()}
+                    className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-gold text-white flex items-center justify-center shadow-md border-2 border-background group-hover:scale-110 transition-transform"
+                    title="Upload avatar"
+                  >
+                    {uploadingAvatar ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Camera className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                  <input
+                    ref={avatarInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={handleAvatarUpload}
+                    className="hidden"
+                  />
                 </div>
                 <h2 className="font-semibold text-lg">{user?.name}</h2>
                 <p className="text-sm text-muted-foreground">{user?.email}</p>
+                <p className="text-xs text-muted-foreground/70 mt-1">
+                  Click the avatar to upload a profile picture
+                </p>
                 {user?.role === 'admin' && (
                   <Badge className="mt-2 bg-gold/10 text-gold">Admin</Badge>
                 )}

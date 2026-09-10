@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet'
 import { useState, useEffect } from 'react'
 import { useSecretAdminAccess } from '@/hooks/use-secret-admin-access'
+import ThemeToggle from '@/components/layout/theme-toggle'
+import UserAvatar from '@/components/layout/user-avatar'
 import {
   ShoppingBag,
   User,
@@ -24,6 +26,8 @@ import {
   Gift,
   Star,
   Heart as HeartIcon,
+  Shield,
+  Settings,
 } from 'lucide-react'
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string; strokeWidth?: number }>> = {
@@ -52,7 +56,7 @@ export default function Navbar() {
   const navigate = useNavStore((s) => s.navigate)
   const currentPage = useNavStore((s) => s.currentPage)
   const itemCount = useCartStore((s) => s.items.reduce((sum, i) => sum + i.quantity, 0))
-  const { isAuthenticated, user, logout } = useAuthStore()
+  const { isAuthenticated, user, logout, setUser } = useAuthStore()
   const setMobileMenuOpen = useUIStore((s) => s.setMobileMenuOpen)
   const isMobileMenuOpen = useUIStore((s) => s.isMobileMenuOpen)
   const setSelectedCategory = useUIStore((s) => s.setSelectedCategory)
@@ -60,6 +64,43 @@ export default function Navbar() {
   const [shopDropdownOpen, setShopDropdownOpen] = useState(false)
   const [navCategories, setNavCategories] = useState<NavCategory[]>([])
   const [announcementItems, setAnnouncementItems] = useState<AnnouncementItemData[]>([])
+
+  // ── Sync auth store with server session on mount ──────────────────────────
+  // The Zustand store is not persisted, so after a full page reload (e.g.,
+  // after sign-in redirect), `isAuthenticated` is false even though the
+  // session cookie is set. This fetches the real session and syncs the store
+  // so the avatar appears instead of the guest "Sign in" button.
+  useEffect(() => {
+    let cancelled = false
+    async function syncAuth() {
+      try {
+        const res = await fetch('/api/auth/me')
+        const data = await res.json()
+        if (cancelled) return
+        if (data.authenticated && data.user) {
+          // Only update if the store doesn't already have this user
+          if (!user || user.id !== data.user.id) {
+            setUser({
+              id: data.user.id,
+              email: data.user.email,
+              name: data.user.name,
+              role: data.user.role,
+              phone: data.user.phone,
+              avatar: data.user.avatar,
+              image: data.user.image,
+            })
+          }
+        } else if (isAuthenticated) {
+          // Store says authenticated but server says no — clear it
+          setUser(null)
+        }
+      } catch {
+        // Network error — leave store as-is
+      }
+    }
+    syncAuth()
+    return () => { cancelled = true }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Hidden admin entry: tap the logo 5× within 1.5s to auto-sign-in as admin
   const handleLogoClick = useSecretAdminAccess(() => navigate('home'))
@@ -151,7 +192,12 @@ export default function Navbar() {
                     </h2>
                   </div>
                 </button>
-                <div className="flex-1 py-4">
+                <div className="flex-1 py-4 overflow-y-auto
+                                [&::-webkit-scrollbar]:w-1.5
+                                [&::-webkit-scrollbar-thumb]:rounded-full
+                                [&::-webkit-scrollbar-thumb]:bg-blush/40
+                                hover:[&::-webkit-scrollbar-thumb]:bg-blush/70
+                                [&::-webkit-scrollbar-track]:bg-transparent">
                   {navLinks.map((link) => (
                     link.page === 'shop' ? (
                       <div key={link.page}>
@@ -167,19 +213,29 @@ export default function Navbar() {
                         >
                           Shop All
                         </button>
-                        {navCategories.map((cat) => (
-                          <button
-                            key={cat.slug}
-                            onClick={() => {
-                              setSelectedCategory(cat.slug)
-                              navigate('shop')
-                              setMobileMenuOpen(false)
-                            }}
-                            className="w-full text-left px-10 py-2 text-sm text-foreground/60 hover:text-gold hover:bg-blush/20 transition-colors"
-                          >
-                            {cat.name}
-                          </button>
-                        ))}
+                        {/* Scrollable category list inside the mobile drawer */}
+                        <div
+                          className="max-h-[50vh] overflow-y-auto
+                                     [&::-webkit-scrollbar]:w-1.5
+                                     [&::-webkit-scrollbar-thumb]:rounded-full
+                                     [&::-webkit-scrollbar-thumb]:bg-blush/40
+                                     hover:[&::-webkit-scrollbar-thumb]:bg-blush/70
+                                     [&::-webkit-scrollbar-track]:bg-transparent"
+                        >
+                          {navCategories.map((cat) => (
+                            <button
+                              key={cat.slug}
+                              onClick={() => {
+                                setSelectedCategory(cat.slug)
+                                navigate('shop')
+                                setMobileMenuOpen(false)
+                              }}
+                              className="w-full text-left px-10 py-2 text-sm text-foreground/60 hover:text-gold hover:bg-blush/20 transition-colors"
+                            >
+                              {cat.name}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     ) : (
                       <button
@@ -221,6 +277,18 @@ export default function Navbar() {
                   </div>
                 )}
               </div>
+
+              {/* Mobile sign-in link for guests (small, optional) */}
+              {!isAuthenticated && (
+                <div className="p-6 border-t border-blush/30 text-center">
+                  <button
+                    onClick={() => { window.location.href = '/auth'; setMobileMenuOpen(false) }}
+                    className="text-xs text-muted-foreground hover:text-gold transition-colors"
+                  >
+                    Sign in / Create account
+                  </button>
+                </div>
+              )}
             </SheetContent>
           </Sheet>
 
@@ -285,19 +353,29 @@ export default function Navbar() {
                         All Products
                       </button>
                       <div className="h-px bg-blush/20 mx-2 my-1" />
-                      {navCategories.map((cat) => (
-                        <button
-                          key={cat.slug}
-                          onClick={() => {
-                            setSelectedCategory(cat.slug)
-                            navigate('shop')
-                            setShopDropdownOpen(false)
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-foreground/70 hover:bg-blush/20 hover:text-gold transition-colors"
-                        >
-                          {cat.name}
-                        </button>
-                      ))}
+                      {/* Scrollable category list — caps at 60vh so 25 categories don't overflow the viewport */}
+                      <div
+                        className="max-h-[60vh] overflow-y-auto
+                                   [&::-webkit-scrollbar]:w-1.5
+                                   [&::-webkit-scrollbar-thumb]:rounded-full
+                                   [&::-webkit-scrollbar-thumb]:bg-blush/40
+                                   hover:[&::-webkit-scrollbar-thumb]:bg-blush/70
+                                   [&::-webkit-scrollbar-track]:bg-transparent"
+                      >
+                        {navCategories.map((cat) => (
+                          <button
+                            key={cat.slug}
+                            onClick={() => {
+                              setSelectedCategory(cat.slug)
+                              navigate('shop')
+                              setShopDropdownOpen(false)
+                            }}
+                            className="w-full text-left px-4 py-2 text-sm text-foreground/70 hover:bg-blush/20 hover:text-gold transition-colors"
+                          >
+                            {cat.name}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -345,43 +423,108 @@ export default function Navbar() {
               <Heart className="h-5 w-5" />
             </Button>
 
-            {/* Admin only: User menu */}
-            {isAuthenticated && user?.role === 'admin' && (
-              <div className="relative hidden sm:block">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-foreground/70 hover:text-gold"
+            {/* User menu (any logged-in user — customer or admin) */}
+            {isAuthenticated && user && (
+              <div className="relative">
+                <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
+                  className="block rounded-full hover:ring-2 hover:ring-gold/40 transition-all focus:outline-none focus:ring-2 focus:ring-gold"
+                  aria-label="Account menu"
+                  title={user.name || user.email}
                 >
-                  <User className="h-5 w-5" />
-                </Button>
+                  <UserAvatar
+                    name={user.name}
+                    email={user.email}
+                    avatar={user.avatar}
+                    image={user.image}
+                    size={36}
+                  />
+                </button>
                 {showUserMenu && (
-                  <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-blush/30 py-2 z-50">
-                    <div className="px-4 py-2 border-b border-blush/20">
-                      <p className="text-sm font-medium">{user?.name}</p>
-                      <p className="text-xs text-muted-foreground">{user?.email}</p>
+                  <>
+                    {/* Click-outside backdrop */}
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setShowUserMenu(false)}
+                    />
+                    <div className="absolute right-0 top-full mt-2 w-60 bg-white rounded-lg shadow-xl border border-blush/30 py-2 z-50">
+                      {/* User info header */}
+                      <div className="px-4 py-3 border-b border-blush/20 flex items-center gap-3">
+                        <UserAvatar
+                          name={user.name}
+                          email={user.email}
+                          avatar={user.avatar}
+                          image={user.image}
+                          size={40}
+                          ring
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">{user.name || 'User'}</p>
+                          <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                        </div>
+                      </div>
+
+                      {/* Menu items */}
+                      <div className="py-1">
+                        <button
+                          onClick={() => { navigate('account'); setShowUserMenu(false) }}
+                          className="w-full text-left px-4 py-2.5 text-sm hover:bg-blush/20 transition-colors flex items-center gap-3"
+                        >
+                          <User className="h-4 w-4 text-muted-foreground" />
+                          Profile
+                        </button>
+                        <button
+                          onClick={() => { navigate('account'); setShowUserMenu(false) }}
+                          className="w-full text-left px-4 py-2.5 text-sm hover:bg-blush/20 transition-colors flex items-center gap-3"
+                        >
+                          <ShoppingBag className="h-4 w-4 text-muted-foreground" />
+                          My Orders
+                        </button>
+                        <button
+                          onClick={() => { navigate('account'); setShowUserMenu(false) }}
+                          className="w-full text-left px-4 py-2.5 text-sm hover:bg-blush/20 transition-colors flex items-center gap-3"
+                        >
+                          <Settings className="h-4 w-4 text-muted-foreground" />
+                          Settings
+                        </button>
+                      </div>
+
+                      {/* Admin link (only for admins) */}
+                      {user.role === 'admin' && (
+                        <>
+                          <div className="border-t border-blush/20 my-1" />
+                          <button
+                            onClick={() => { navigate('admin'); setShowUserMenu(false) }}
+                            className="w-full text-left px-4 py-2.5 text-sm text-rose hover:bg-blush/20 transition-colors flex items-center gap-3"
+                          >
+                            <Shield className="h-4 w-4" />
+                            Admin Dashboard
+                          </button>
+                        </>
+                      )}
+
+                      {/* Sign out */}
+                      <div className="border-t border-blush/20 my-1" />
+                      <button
+                        onClick={async () => {
+                          await logout()
+                          setShowUserMenu(false)
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-sm text-destructive hover:bg-destructive/10 transition-colors flex items-center gap-3"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        Sign Out
+                      </button>
                     </div>
-                    <button
-                      onClick={() => { navigate('admin'); setShowUserMenu(false) }}
-                      className="w-full text-left px-4 py-2 text-sm text-rose hover:bg-blush/20 transition-colors"
-                    >
-                      Admin Dashboard
-                    </button>
-                    <button
-                      onClick={async () => { 
-                        await logout(); 
-                        setShowUserMenu(false); 
-                      }}
-                      className="w-full text-left px-4 py-2 text-sm text-destructive hover:bg-blush/20 transition-colors flex items-center gap-2"
-                    >
-                      <LogOut className="h-4 w-4" />
-                      Admin Logout
-                    </button>
-                  </div>
+                  </>
                 )}
               </div>
             )}
+            {/* Guests browse freely — no sign-in button in the navbar.
+                Customers can sign in via /auth or the footer link if they want. */}
+
+            {/* Theme toggle (dark/light) */}
+            <ThemeToggle />
 
             {/* Cart */}
             <Button

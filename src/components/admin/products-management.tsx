@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback, useRef } from 'react'
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import Image from 'next/image'
 import {
   Plus,
@@ -179,6 +179,42 @@ function generateSlug(name: string): string {
     .replace(/^-|-$/g, '')
 }
 
+function deriveProductNameFromFilename(filename: string): string {
+  const noExt = filename.replace(/\?.*$/, '').replace(/\.[a-z0-9]+$/i, '')
+  const words = noExt
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .split(/[-_.\s]+/)
+    .map((w) => w.trim())
+    .filter(Boolean)
+  if (words.length === 0) return ''
+  const NOISE = new Set([
+    'img', 'dsc', 'dscn', 'img_', 'dsc_', 'image', 'images', 'photo', 'photos',
+    'video', 'videos', 'vid', 'pic', 'pics', 'picture', 'pictures', 'copy',
+    'screenshot', 'screen', 'shot', 'file', 'upload', 'download', 'untitled',
+    'compressed', 'resized', 'edited', 'final', 'export',
+  ])
+  const cleaned: string[] = []
+  for (let w of words) {
+    const lower = w.toLowerCase()
+    if (/^\d+$/.test(w)) continue
+    const stripped = w.replace(/\d+$/, '')
+    if (stripped && NOISE.has(stripped.toLowerCase())) continue
+    if (NOISE.has(lower)) continue
+    if (/^\(\d+\)$/.test(w)) continue
+    cleaned.push(stripped || w)
+  }
+  if (cleaned.length === 0) return ''
+  const name = cleaned
+    .map((w) => {
+      if (w.length <= 4 && w === w.toUpperCase()) return w
+      return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+    })
+    .join(' ')
+    .trim()
+  if (name.length < 2 || !/[a-zA-Z]/.test(name)) return ''
+  return name
+}
+
 function formatPrice(amount: number): string {
   return `$${amount.toLocaleString()}`
 }
@@ -247,6 +283,10 @@ export default function ProductsManagement({
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Refs that mirror form + slugManuallyEdited so upload handler reads latest values
+  const formRef = useRef(form)
+  useEffect(() => { formRef.current = form }, [form])
+
   // ── Delete dialog state ──
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -255,6 +295,8 @@ export default function ProductsManagement({
 
   // ── Slug auto-gen tracking ──
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false)
+  const slugManuallyEditedRef = useRef(slugManuallyEdited)
+  useEffect(() => { slugManuallyEditedRef.current = slugManuallyEdited }, [slugManuallyEdited])
 
   // ── Derived data ──
   const filteredProducts = useMemo(() => {
@@ -373,6 +415,23 @@ export default function ProductsManagement({
     })
 
     if (validFiles.length === 0) return
+
+    // ── Auto-detect product name from the first file (only if name field is empty) ──
+    const currentName = formRef.current.name?.trim() ?? ''
+    if (!currentName) {
+      for (const f of validFiles) {
+        const derived = deriveProductNameFromFilename(f.name)
+        if (derived) {
+          if (!slugManuallyEditedRef.current) {
+            setForm((prev) => ({ ...prev, name: derived, slug: generateSlug(derived) }))
+          } else {
+            setForm((prev) => ({ ...prev, name: derived }))
+          }
+          toast.info(`Auto-detected product name: "${derived}" — edit if needed.`)
+          break
+        }
+      }
+    }
 
     setUploading(true)
     try {

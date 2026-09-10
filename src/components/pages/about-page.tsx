@@ -2,7 +2,7 @@
 
 import { useNavStore } from '@/store/nav-store'
 import { motion } from 'framer-motion'
-import { Heart, Leaf, Shield, Award, Sparkles } from 'lucide-react'
+import { Heart, Leaf, Shield, Award } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import Image from 'next/image'
 
@@ -28,21 +28,14 @@ export default function AboutPage() {
 
       {/* Mission */}
       <section className="py-16">
-        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <div>
-              <h2 className="text-3xl font-bold mb-6" style={{ fontFamily: 'var(--font-playfair), serif' }}>Our Mission</h2>
-              <p className="text-muted-foreground leading-relaxed mb-4">
-                At Angel Beauty, we are passionate about creating skincare products that truly make a difference. Founded with a vision to provide premium, effective skincare solutions, we source the finest natural ingredients from around the world.
-              </p>
-              <p className="text-muted-foreground leading-relaxed">
-                Every product in our collection has been meticulously formulated, dermatologist-tested, and proven to deliver real results. We don&apos;t just sell skincare &mdash; we empower women to embrace their natural beauty with confidence.
-              </p>
-            </div>
-            <div className="aspect-square rounded-2xl bg-gradient-to-br from-gold/10 via-rose/5 to-blush/20 flex items-center justify-center">
-              <Sparkles className="w-24 h-24 text-gold/30" />
-            </div>
-          </div>
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-3xl font-bold mb-6" style={{ fontFamily: 'var(--font-playfair), serif' }}>Our Mission</h2>
+          <p className="text-muted-foreground leading-relaxed mb-4">
+            At Angel Beauty, we are passionate about creating skincare products that truly make a difference. Founded with a vision to provide premium, effective skincare solutions, we source the finest natural ingredients from around the world.
+          </p>
+          <p className="text-muted-foreground leading-relaxed">
+            Every product in our collection has been meticulously formulated, dermatologist-tested, and proven to deliver real results. We don&apos;t just sell skincare &mdash; we empower women to embrace their natural beauty with confidence.
+          </p>
         </div>
       </section>
 

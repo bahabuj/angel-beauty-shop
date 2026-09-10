@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/sonner";
 import SessionProvider from "@/components/providers/session-provider";
 import ServiceWorkerRegister from "@/components/service-worker-register";
 import { buildBaseMetadata, SITE_CONFIG } from "@/lib/seo";
+import { ThemeProvider } from "next-themes";
 
 // Preload fonts — `display: swap` lets text render immediately with fallback font
 // while the web font downloads, so users see content instantly.
@@ -39,9 +40,11 @@ export default function RootLayout({
         className={`${playfair.variable} ${inter.variable} antialiased bg-background text-foreground font-sans`}
         style={{ fontFamily: 'var(--font-inter), sans-serif' }}
       >
-        <SessionProvider>
-          {children}
-        </SessionProvider>
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
+          <SessionProvider>
+            {children}
+          </SessionProvider>
+        </ThemeProvider>
         <ServiceWorkerRegister />
         <Toaster richColors position="top-right" />
       </body>

@@ -220,8 +220,19 @@ export default function ShopPage() {
           <aside className={`${showFilters ? 'block' : 'hidden'} lg:block w-56 shrink-0`}>
             <div className="sticky top-24 space-y-6">
               <div>
-                <h3 className="font-semibold text-sm mb-3">Categories</h3>
-                <div className="space-y-1.5">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-sm">Categories</h3>
+                  <span className="text-xs text-muted-foreground">{categories.length} items</span>
+                </div>
+                {/* Scrollable category list — stays compact even with many categories */}
+                <div
+                  className="space-y-1.5 max-h-[60vh] overflow-y-auto pr-1
+                             [&::-webkit-scrollbar]:w-1.5
+                             [&::-webkit-scrollbar-thumb]:rounded-full
+                             [&::-webkit-scrollbar-thumb]:bg-blush/40
+                             hover:[&::-webkit-scrollbar-thumb]:bg-blush/70
+                             [&::-webkit-scrollbar-track]:bg-transparent"
+                >
                   <button
                     onClick={() => setSelectedCategory('all')}
                     className={`w-full text-left text-sm px-3 py-2 rounded-lg transition-colors ${selectedCategory === 'all' ? 'bg-gold/10 text-gold font-medium' : 'text-muted-foreground hover:bg-blush/20'}`}

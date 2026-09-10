@@ -33,6 +33,7 @@ interface AdminHeaderProps {
   adminEmail: string
   onMenuToggle: () => void
   onNavigate: (page: string) => void
+  onBackToStore: () => void
   onLogout: () => void
 }
 
@@ -55,6 +56,7 @@ export function AdminHeader({
   adminEmail,
   onMenuToggle,
   onNavigate,
+  onBackToStore,
   onLogout,
 }: AdminHeaderProps) {
   const [searchQuery, setSearchQuery] = useState('')
@@ -215,7 +217,7 @@ export function AdminHeader({
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="cursor-pointer py-2.5 focus:bg-blush/40"
-                  onClick={() => onNavigate('store')}
+                  onClick={onBackToStore}
                 >
                   <ArrowLeft className="size-4 text-muted-foreground" />
                   <span>Back to Store</span>

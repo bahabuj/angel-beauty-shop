@@ -3,15 +3,14 @@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Sparkles, ArrowRight, Eye, EyeOff, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+import { Sparkles, ArrowRight, Eye, EyeOff, ChevronLeft, ChevronRight, Loader2, Mail, KeyRound } from 'lucide-react'
 import { toast } from 'sonner'
 import Image from 'next/image'
-import { getAdditionalUserInfo, getRedirectResult, onAuthStateChanged, signInWithPopup, signInWithRedirect } from 'firebase/auth'
-import { auth, googleProvider } from '@/lib/firebase'
 
 interface AuthSlideData {
   id: string
@@ -35,6 +34,7 @@ function AuthForm() {
   const searchParams = useSearchParams()
   const { data: session, status: sessionStatus } = useSession()
   const callbackUrl = searchParams.get('callbackUrl') || '/'
+  const resetToken = searchParams.get('resetToken')
   const safeCallbackUrl = (() => {
     if (!callbackUrl.startsWith('/')) return '/'
     if (callbackUrl.startsWith('/auth')) return '/'
@@ -47,26 +47,113 @@ function AuthForm() {
   const [showPassword, setShowPassword] = useState(false)
   const [form, setForm] = useState({ name: '', email: '', password: '' })
   const [submitting, setSubmitting] = useState(false)
-  const [googleLoading, setGoogleLoading] = useState(false)
-  const [googlePopupIssue, setGooglePopupIssue] = useState<string | null>(null)
+  const [rememberMe, setRememberMe] = useState(true)
   const [currentSlide, setCurrentSlide] = useState(0)
   const [slides, setSlides] = useState<AuthSlideData[]>([])
   const [slidesLoading, setSlidesLoading] = useState(true)
-  const [showManualForm, setShowManualForm] = useState(false)
+
+  // ── Password reset flow state ──────────────────────────────────────────────
+  // When the user clicks the reset link in their email, the URL contains
+  // ?resetToken=xxx. We validate it against /api/auth/reset-password and show
+  // a "set new password" form instead of the regular login.
+  const [resetMode, setResetMode] = useState(false)
+  const [resetTokenValid, setResetTokenValid] = useState<boolean | null>(null)
+  const [resetEmailMasked, setResetEmailMasked] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState('')
+  const [resetSubmitting, setResetSubmitting] = useState(false)
+  const [resetComplete, setResetComplete] = useState(false)
+
+  // ── Forgot-password modal state ───────────────────────────────────────────
+  const [showForgotPassword, setShowForgotPassword] = useState(false)
+  const [resetEmail, setResetEmail] = useState('')
+  const [forgotSubmitting, setForgotSubmitting] = useState(false)
+  const [resetSent, setResetSent] = useState(false)
+
   const videoRef = useRef<HTMLVideoElement>(null)
   const isRedirecting = useRef(false)
 
-  const openAuthInNewTab = () => {
-    window.open(window.location.href, '_blank', 'noopener,noreferrer')
+  // ── Forgot-password modal submit ──────────────────────────────────────────
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!resetEmail.trim()) {
+      toast.error('Please enter your email address')
+      return
+    }
+    setForgotSubmitting(true)
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: resetEmail.trim() }),
+      })
+      const data = await res.json()
+      // Always show the "if the email exists, we've sent a link" message
+      // (don't leak whether the email is registered)
+      setResetSent(true)
+      toast.success('If that email is registered, a reset link is on its way.')
+
+      // In dev mode, the API returns the resetUrl — log it for easy testing
+      if (data.resetUrl) {
+        console.log('[Dev] Password reset URL:', data.resetUrl)
+      }
+    } catch {
+      toast.error('Something went wrong. Please try again.')
+    } finally {
+      setForgotSubmitting(false)
+    }
   }
 
-  const copyAuthUrl = async () => {
-    const url = window.location.href
+  // ── Validate reset token on mount (if ?resetToken=xxx is in the URL) ──────
+  useEffect(() => {
+    if (!resetToken) return
+    setResetMode(true)
+    fetch(`/api/auth/reset-password?token=${encodeURIComponent(resetToken)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success && data.valid) {
+          setResetTokenValid(true)
+          setResetEmailMasked(data.email || '')
+        } else {
+          setResetTokenValid(false)
+        }
+      })
+      .catch(() => setResetTokenValid(false))
+  }, [resetToken])
+
+  // ── Set new password submit (reset flow) ──────────────────────────────────
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!resetToken) {
+      toast.error('Missing reset token')
+      return
+    }
+    if (newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters')
+      return
+    }
+    if (newPassword !== newPasswordConfirm) {
+      toast.error('Passwords do not match')
+      return
+    }
+    setResetSubmitting(true)
     try {
-      await navigator.clipboard.writeText(url)
-      toast.success('Link copied.')
+      const res = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: resetToken, password: newPassword }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setResetComplete(true)
+        toast.success('Password reset! You can now sign in.')
+      } else {
+        toast.error(data.error || 'Failed to reset password')
+      }
     } catch {
-      toast.error(url)
+      toast.error('Something went wrong. Please try again.')
+    } finally {
+      setResetSubmitting(false)
     }
   }
 
@@ -83,105 +170,6 @@ function AuthForm() {
       }
     }
   }, [sessionStatus, safeCallbackUrl, session])
-
-  // Auto-sign-in on page load: Try silent Firebase sign-in + backend verification
-  useEffect(() => {
-    if (sessionStatus !== 'unauthenticated' || isRedirecting.current) return
-
-    let isMounted = true
-    let timeoutId: NodeJS.Timeout | null = null
-
-    const attemptSilentSignIn = async () => {
-      try {
-        // Check if user is already logged in to Firebase
-        const checkAuth = new Promise<boolean>(resolve => {
-          const unsubscribe = onAuthStateChanged(auth, async user => {
-            unsubscribe()
-            
-            if (!user) {
-              // No existing session — user will click Google button
-              resolve(false)
-              return
-            }
-
-            // Get the ID token and verify with backend
-            const idToken = await user.getIdToken()
-            const res = await fetch('/api/auth/firebase-signin', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ idToken }),
-            })
-            const data = await res.json()
-
-            if (data.success && isMounted) {
-              // Auto-redirect after successful silent sign-in
-              isRedirecting.current = true
-              if (data.user?.role === 'admin') {
-                window.location.href = '/#admin'
-              } else {
-                window.location.replace(safeCallbackUrl)
-              }
-              resolve(true)
-            }
-            resolve(false)
-          })
-
-          // Timeout after 3 seconds to avoid hanging
-          timeoutId = setTimeout(() => unsubscribe(), 3000)
-        })
-
-        await checkAuth
-      } catch (error) {
-        // Silent sign-in failed or not available
-        console.debug('Silent sign-in not available')
-      }
-    }
-
-    attemptSilentSignIn()
-
-    return () => {
-      isMounted = false
-      if (timeoutId) clearTimeout(timeoutId)
-    }
-  }, [sessionStatus, safeCallbackUrl])
-
-  // Handle redirect result from Firebase Google sign-in
-  useEffect(() => {
-    if (sessionStatus !== 'unauthenticated' || isRedirecting.current) return
-
-    let isMounted = true
-
-    const handleRedirectResult = async () => {
-      try {
-        const result = await getRedirectResult(auth)
-        
-        if (result && result.user && isMounted) {
-          // User signed in via redirect
-          const idToken = await result.user.getIdToken()
-          const res = await fetch('/api/auth/firebase-signin', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ idToken }),
-          })
-          const data = await res.json()
-
-          if (data.success && data.user) {
-            const isNewUser = getAdditionalUserInfo(result)?.isNewUser
-            toast.success(isNewUser ? 'Account created successfully!' : 'Welcome back!')
-            redirectAfterLogin(data.user.role)
-          }
-        }
-      } catch (error: any) {
-        console.error('Redirect result error:', error)
-      }
-    }
-
-    handleRedirectResult()
-
-    return () => {
-      isMounted = false
-    }
-  }, [sessionStatus, safeCallbackUrl])
 
   // Load slides from database
   useEffect(() => {
@@ -280,6 +268,7 @@ function AuthForm() {
           body: JSON.stringify({
             email: form.email.trim(),
             password: form.password,
+            rememberMe,
           }),
         })
         const data = await res.json()
@@ -317,6 +306,7 @@ function AuthForm() {
           body: JSON.stringify({
             email: form.email.trim(),
             password: form.password,
+            rememberMe,
           }),
         })
         const signinData = await signinRes.json()
@@ -332,71 +322,6 @@ function AuthForm() {
       toast.error('Something went wrong. Please try again.')
     } finally {
       setSubmitting(false)
-    }
-  }
-
-  // ===== GOOGLE SIGN-IN =====
-  const handleGoogleSignIn = async () => {
-    setGoogleLoading(true)
-    setGooglePopupIssue(null)
-    try {
-      const withTimeout = async <T,>(promise: Promise<T>, ms: number) => {
-        return await new Promise<T>((resolve, reject) => {
-          const timeoutId = setTimeout(() => reject(new Error('timeout')), ms)
-          promise
-            .then(value => {
-              clearTimeout(timeoutId)
-              resolve(value)
-            })
-            .catch(err => {
-              clearTimeout(timeoutId)
-              reject(err)
-            })
-        })
-      }
-
-      try {
-        const result = await withTimeout(signInWithPopup(auth, googleProvider), 15000)
-        const idToken = await result.user.getIdToken()
-
-        const res = await fetch('/api/auth/firebase-signin', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ idToken }),
-        })
-        const data = await res.json()
-
-        if (data.success && data.user) {
-          toast.success('Welcome back!')
-          redirectAfterLogin(data.user.role)
-          return
-        }
-
-        toast.error(data.error || 'Google Sign-In failed. Please try again.')
-        return
-      } catch (popupError: any) {
-        const code = popupError?.code
-        const shouldFallbackToRedirect =
-          popupError instanceof Error && popupError.message === 'timeout'
-            ? true
-            : code === 'auth/popup-blocked' ||
-              code === 'auth/popup-closed-by-user' ||
-              code === 'auth/cancelled-popup-request' ||
-              code === 'auth/operation-not-supported-in-this-environment'
-
-        if (shouldFallbackToRedirect) {
-          toast.message('Redirecting to Google...')
-          await signInWithRedirect(auth, googleProvider)
-          return
-        }
-
-        throw popupError
-      }
-    } catch (error: any) {
-      console.error('Google sign-in error:', error)
-      toast.error('Google Sign-In failed. Please try again.')
-    } finally {
-      setGoogleLoading(false)
     }
   }
 
@@ -583,6 +508,110 @@ function AuthForm() {
                   exit={{ opacity: 0, x: -10 }}
                   transition={{ duration: 0.3 }}
                 >
+                  {resetMode ? (
+                    /* ── Password Reset Form (when arriving via ?resetToken=xxx) ── */
+                    <div>
+                      <h1 className="text-2xl font-bold mb-1 text-white" style={{ fontFamily: 'var(--font-playfair), serif' }}>
+                        Set New Password
+                      </h1>
+                      {resetComplete ? (
+                        <div className="text-center py-8">
+                          <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-green-500/20 flex items-center justify-center">
+                            <KeyRound className="w-7 h-7 text-green-400" />
+                          </div>
+                          <p className="text-white text-sm mb-6">
+                            Your password has been reset successfully.
+                          </p>
+                          <Button
+                            onClick={() => {
+                              setResetMode(false)
+                              setIsLogin(true)
+                              // Clean the URL (remove ?resetToken=)
+                              window.history.replaceState({}, '', '/#auth')
+                            }}
+                            className="w-full bg-gold hover:bg-gold-light text-white h-11"
+                          >
+                            Continue to Sign In
+                          </Button>
+                        </div>
+                      ) : resetTokenValid === false ? (
+                        <div className="text-center py-8">
+                          <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-red-500/20 flex items-center justify-center">
+                            <span className="text-2xl">⚠️</span>
+                          </div>
+                          <p className="text-white text-sm mb-6">
+                            This password reset link is invalid, expired, or has already been used.
+                          </p>
+                          <Button
+                            onClick={() => {
+                              setResetMode(false)
+                              setShowForgotPassword(true)
+                              window.history.replaceState({}, '', '/#auth')
+                            }}
+                            className="w-full bg-gold hover:bg-gold-light text-white h-11"
+                          >
+                            Request a new link
+                          </Button>
+                        </div>
+                      ) : resetTokenValid === true ? (
+                        <form onSubmit={handleResetPassword} className="space-y-4 mt-4">
+                          {resetEmailMasked && (
+                            <p className="text-xs text-white/50 text-center">
+                              Resetting password for <strong className="text-white/80">{resetEmailMasked}</strong>
+                            </p>
+                          )}
+                          <div>
+                            <Label htmlFor="new-password" className="text-white/70 text-xs">New Password</Label>
+                            <Input
+                              id="new-password"
+                              type={showPassword ? 'text' : 'password'}
+                              value={newPassword}
+                              onChange={(e) => setNewPassword(e.target.value)}
+                              placeholder="Enter new password"
+                              className="bg-white/10 backdrop-blur-md border-white/20 focus:border-gold/50 focus:ring-gold/20 text-white placeholder:text-white/30 mt-1.5 h-11"
+                              style={{ colorScheme: 'dark' }}
+                              autoComplete="new-password"
+                              required
+                            />
+                            <p className="text-white/30 text-[11px] mt-1">Must be at least 6 characters</p>
+                          </div>
+                          <div>
+                            <Label htmlFor="new-password-confirm" className="text-white/70 text-xs">Confirm New Password</Label>
+                            <Input
+                              id="new-password-confirm"
+                              type={showPassword ? 'text' : 'password'}
+                              value={newPasswordConfirm}
+                              onChange={(e) => setNewPasswordConfirm(e.target.value)}
+                              placeholder="Re-enter new password"
+                              className="bg-white/10 backdrop-blur-md border-white/20 focus:border-gold/50 focus:ring-gold/20 text-white placeholder:text-white/30 mt-1.5 h-11"
+                              style={{ colorScheme: 'dark' }}
+                              autoComplete="new-password"
+                              required
+                            />
+                          </div>
+                          <Button
+                            type="submit"
+                            disabled={resetSubmitting}
+                            className="w-full bg-gold hover:bg-gold-light text-white h-11 beauty-btn font-semibold"
+                          >
+                            {resetSubmitting ? (
+                              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                            ) : (
+                              <KeyRound className="w-4 h-4 mr-2" />
+                            )}
+                            {resetSubmitting ? 'Resetting...' : 'Reset Password'}
+                          </Button>
+                        </form>
+                      ) : (
+                        <div className="text-center py-8">
+                          <Loader2 className="w-6 h-6 text-gold animate-spin mx-auto" />
+                          <p className="text-white/60 text-xs mt-3">Verifying reset link…</p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    /* ── Regular Login / Signup Form ── */
+                    <>
                   <h1 className="text-2xl font-bold mb-1 text-white" style={{ fontFamily: 'var(--font-playfair), serif' }}>
                     {isLogin ? 'Welcome Back' : 'Create Account'}
                   </h1>
@@ -590,74 +619,8 @@ function AuthForm() {
                     {isLogin ? 'Sign in to your account to continue' : 'Join the Angelsbeauty family'}
                   </p>
 
-                  {/* Google Sign-In - Primary Option */}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleGoogleSignIn}
-                    disabled={googleLoading || submitting}
-                    className="w-full h-12 backdrop-blur-md border-white/20 hover:bg-white/20 hover:border-white/30 text-white mb-2 flex items-center justify-center gap-3 text-sm font-medium transition-all duration-300 disabled:opacity-50 bg-white/10 hover:shadow-lg"
-                  >
-                    {googleLoading ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20">
-                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
-                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                      </svg>
-                    )}
-                    {googleLoading ? 'Connecting to Google...' : 'Continue with Google'}
-                  </Button>
-                  {googlePopupIssue && (
-                    <div className="mb-3 rounded-lg bg-white/10 border border-white/15 p-3 text-xs text-white/80">
-                      <div className="mb-2">{googlePopupIssue}</div>
-                      <div className="flex items-center gap-4">
-                        <button
-                          type="button"
-                          onClick={openAuthInNewTab}
-                          className="text-gold hover:underline"
-                        >
-                          Open /auth in a new tab
-                        </button>
-                        <button
-                          type="button"
-                          onClick={copyAuthUrl}
-                          className="text-gold hover:underline"
-                        >
-                          Copy link
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Toggle Manual Form Option */}
-                  {!showManualForm && (
-                    <button
-                      type="button"
-                      onClick={() => setShowManualForm(true)}
-                      className="w-full py-2 text-xs text-white/50 hover:text-white/70 transition-colors duration-200"
-                    >
-                      or sign in with email
-                    </button>
-                  )}
-
-                  {/* Divider */}
-                  {showManualForm && (
-                    <div className="relative my-5">
-                      <div className="absolute inset-0 flex items-center">
-                        <div className="w-full border-t border-white/15" />
-                      </div>
-                      <div className="relative flex justify-center text-xs">
-                        <span className="bg-white/10 px-3 text-white/40 backdrop-blur-sm rounded-full">email alternative</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Manual Form - Optional */}
-                  {showManualForm && (
-                  <form onSubmit={handleSubmit} className="space-y-4 mt-6">
+                  {/* Email + Password Form (primary auth method) */}
+                  <form onSubmit={handleSubmit} className="space-y-4 mt-2">
                     {!isLogin && (
                       <div>
                         <Label htmlFor="name" className="text-white/70 text-xs">Full Name</Label>
@@ -712,9 +675,47 @@ function AuthForm() {
                       )}
                     </div>
 
+                    {/* Remember me + Forgot password (only on login) */}
+                    {isLogin ? (
+                      <div className="flex items-center justify-between">
+                        <label className="flex items-center gap-2 cursor-pointer group">
+                          <Checkbox
+                            checked={rememberMe}
+                            onCheckedChange={(v) => setRememberMe(v === true)}
+                            className="border-white/40 data-[state=checked]:bg-gold data-[state=checked]:border-gold"
+                          />
+                          <span className="text-xs text-white/60 group-hover:text-white/80 transition-colors">
+                            Remember me
+                          </span>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setResetEmail(form.email)
+                            setResetSent(false)
+                            setShowForgotPassword(true)
+                          }}
+                          className="text-xs text-gold/80 hover:text-gold hover:underline transition-colors"
+                        >
+                          Forgot password?
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex items-center gap-2 cursor-pointer group">
+                        <Checkbox
+                          checked={rememberMe}
+                          onCheckedChange={(v) => setRememberMe(v === true)}
+                          className="border-white/40 data-[state=checked]:bg-gold data-[state=checked]:border-gold"
+                        />
+                        <span className="text-xs text-white/60 group-hover:text-white/80 transition-colors">
+                          Keep me signed in
+                        </span>
+                      </label>
+                    )}
+
                     <Button
                       type="submit"
-                      disabled={submitting || googleLoading}
+                      disabled={submitting}
                       className="w-full bg-gold hover:bg-gold-light text-white h-11 beauty-btn font-semibold"
                     >
                       {submitting ? (
@@ -724,26 +725,8 @@ function AuthForm() {
                       )}
                       {submitting ? 'Please wait...' : (isLogin ? 'Sign In' : 'Create Account')}
                     </Button>
-
-                    <div className="mt-3 text-center">
-                      <button
-                        type="button"
-                        onClick={() => setShowManualForm(false)}
-                        className="text-xs text-white/40 hover:text-white/60 transition-colors"
-                      >
-                        Back to Google Sign-In
-                      </button>
-                    </div>
                   </form>
-                  )}
 
-                  {!showManualForm && (
-                  <div className="mt-6 text-center text-xs text-white/40">
-                    <p>Fast & secure • No password needed</p>
-                  </div>
-                  )}
-
-                  {showManualForm && (
                   <div className="mt-5 text-center">
                     <p className="text-sm text-white/50">
                       {isLogin ? "Don't have an account?" : 'Already have an account?'}{' '}
@@ -755,12 +738,105 @@ function AuthForm() {
                       </button>
                     </p>
                   </div>
+                    </>
                   )}
                 </motion.div>
               </AnimatePresence>
             </div>
           </motion.div>
         </div>
+
+        {/* ── Forgot Password Modal ─────────────────────────────────────────── */}
+        {showForgotPassword && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            onClick={() => setShowForgotPassword(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-gold/10 flex items-center justify-center">
+                  <KeyRound className="w-5 h-5 text-gold" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg" style={{ fontFamily: 'var(--font-playfair), serif' }}>
+                    Reset your password
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    We'll email you a secure reset link.
+                  </p>
+                </div>
+              </div>
+
+              {resetSent ? (
+                <div className="text-center py-4">
+                  <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-green-100 flex items-center justify-center">
+                    <Mail className="w-6 h-6 text-green-600" />
+                  </div>
+                  <p className="text-sm text-foreground mb-4">
+                    If an account exists for <strong>{resetEmail}</strong>, a password reset link is on its way.
+                  </p>
+                  <p className="text-xs text-muted-foreground mb-4">
+                    Check your inbox (and spam folder) for an email from Angels Beauty. The link expires in 1 hour.
+                  </p>
+                  <Button
+                    onClick={() => {
+                      setShowForgotPassword(false)
+                      setResetSent(false)
+                      setResetEmail('')
+                    }}
+                    className="w-full bg-gold hover:bg-gold-light text-white"
+                  >
+                    Done
+                  </Button>
+                </div>
+              ) : (
+                <form onSubmit={handleForgotPassword} className="space-y-4">
+                  <div>
+                    <Label htmlFor="reset-email" className="text-xs">Email Address</Label>
+                    <Input
+                      id="reset-email"
+                      type="email"
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      className="mt-1.5"
+                      autoFocus
+                      required
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => setShowForgotPassword(false)}
+                      className="flex-1"
+                      disabled={forgotSubmitting}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={forgotSubmitting}
+                      className="flex-1 bg-gold hover:bg-gold-light text-white"
+                    >
+                      {forgotSubmitting ? (
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      ) : (
+                        <Mail className="w-4 h-4 mr-2" />
+                      )}
+                      {forgotSubmitting ? 'Sending...' : 'Send Reset Link'}
+                    </Button>
+                  </div>
+                </form>
+              )}
+            </motion.div>
+          </div>
+        )}
       </div>
     </div>
   )

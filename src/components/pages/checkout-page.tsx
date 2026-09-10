@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
 import { useNavStore } from '@/store/nav-store'
 import { useCartStore, useCartHydrated } from '@/store/cart-store'
@@ -10,10 +10,73 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, ShoppingBag, Shield, Truck, Lock, Loader2, ExternalLink, AlertTriangle, Settings, Mail, Phone, Globe } from 'lucide-react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { ArrowLeft, ShoppingBag, Shield, Truck, Lock, Loader2, ExternalLink, AlertTriangle, Settings, Mail, Phone, Globe, Tag, X, CheckCircle2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 type CheckoutPhase = 'info' | 'redirecting' | 'error'
+
+interface ShippingZone {
+  id: string
+  name: string
+  code: string
+  flag: string
+  rate: number
+  estimatedDays: string
+  active: boolean
+}
+
+interface AppliedPromotion {
+  id: string
+  name: string
+  type: string
+  discount: number
+  couponCode: string
+  freeShipping: boolean
+}
+
+// Country list matching the 11 shipping zones. The value is what gets sent
+// to /api/orders as `country`; the server matches it back to a zone code.
+const COUNTRIES = [
+  { value: 'United States',         label: '🇺🇸 United States',         zoneCode: 'US' },
+  { value: 'Canada',                label: '🇨🇦 Canada',                zoneCode: 'CA' },
+  { value: 'Mexico',                label: '🇲🇽 Mexico',                zoneCode: 'MX' },
+  { value: 'United Kingdom',        label: '🇬🇧 United Kingdom',        zoneCode: 'UK' },
+  { value: 'Ireland',               label: '🇮🇪 Ireland',               zoneCode: 'UK' },
+  { value: 'Germany',               label: '🇩🇪 Germany',               zoneCode: 'EU' },
+  { value: 'France',                label: '🇫🇷 France',                zoneCode: 'EU' },
+  { value: 'Spain',                 label: '🇪🇸 Spain',                 zoneCode: 'EU' },
+  { value: 'Italy',                 label: '🇮🇹 Italy',                 zoneCode: 'EU' },
+  { value: 'Netherlands',           label: '🇳🇱 Netherlands',           zoneCode: 'EU' },
+  { value: 'Nigeria',               label: '🇳🇬 Nigeria',               zoneCode: 'AF' },
+  { value: 'Ghana',                 label: '🇬🇭 Ghana',                 zoneCode: 'AF' },
+  { value: 'Kenya',                 label: '🇰🇪 Kenya',                 zoneCode: 'AF' },
+  { value: 'South Africa',          label: '🇿🇦 South Africa',          zoneCode: 'AF' },
+  { value: 'Egypt',                 label: '🇪🇬 Egypt',                 zoneCode: 'AF' },
+  { value: 'Morocco',               label: '🇲🇦 Morocco',               zoneCode: 'AF' },
+  { value: 'China',                 label: '🇨🇳 China',                 zoneCode: 'AS' },
+  { value: 'Japan',                 label: '🇯🇵 Japan',                 zoneCode: 'AS' },
+  { value: 'South Korea',           label: '🇰🇷 South Korea',           zoneCode: 'AS' },
+  { value: 'India',                 label: '🇮🇳 India',                 zoneCode: 'AS' },
+  { value: 'Indonesia',             label: '🇮🇩 Indonesia',             zoneCode: 'AS' },
+  { value: 'Philippines',           label: '🇵🇭 Philippines',           zoneCode: 'AS' },
+  { value: 'Australia',             label: '🇦🇺 Australia',             zoneCode: 'AU' },
+  { value: 'New Zealand',           label: '🇳🇿 New Zealand',           zoneCode: 'AU' },
+  { value: 'Brazil',                label: '🇧🇷 Brazil',                zoneCode: 'SA' },
+  { value: 'Argentina',             label: '🇦🇷 Argentina',             zoneCode: 'SA' },
+  { value: 'Colombia',              label: '🇨🇴 Colombia',              zoneCode: 'SA' },
+  { value: 'Saudi Arabia',          label: '🇸🇦 Saudi Arabia',          zoneCode: 'ME' },
+  { value: 'UAE',                   label: '🇦🇪 United Arab Emirates',  zoneCode: 'ME' },
+  { value: 'Qatar',                 label: '🇶🇦 Qatar',                 zoneCode: 'ME' },
+  { value: 'Turkey',                label: '🇹🇷 Turkey',                zoneCode: 'ME' },
+  { value: 'Other',                 label: '🌐 Other',                  zoneCode: 'OTH' },
+]
 
 export default function CheckoutPage() {
   const navigate = useNavStore((s) => s.navigate)
@@ -25,10 +88,48 @@ export default function CheckoutPage() {
   const [errorMessage, setErrorMessage] = useState('')
   const [requiresConfig, setRequiresConfig] = useState(false)
 
+  // ─── Shipping zones + country selection ─────────────────────────────────
+  const [shippingZones, setShippingZones] = useState<ShippingZone[]>([])
+  const [selectedCountry, setSelectedCountry] = useState('United States')
+
+  // ─── Coupon code state ──────────────────────────────────────────────────
+  const [couponInput, setCouponInput] = useState('')
+  const [validatingCoupon, setValidatingCoupon] = useState(false)
+  const [appliedPromotion, setAppliedPromotion] = useState<AppliedPromotion | null>(null)
+  const [discountAmount, setDiscountAmount] = useState(0)
+  const [couponFreeShipping, setCouponFreeShipping] = useState(false)
+
+  // ─── Load shipping zones on mount ───────────────────────────────────────
+  useEffect(() => {
+    fetch('/api/shipping-zones')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success) setShippingZones(data.zones)
+      })
+      .catch((e) => console.error('Failed to load shipping zones:', e))
+  }, [])
+
   const subtotal = getSubtotal()
-  const hasFreeShipping = items.some(item => item.freeShipping)
-  const shipping = hasFreeShipping || subtotal >= 100 ? 0 : 15
-  const total = subtotal + shipping
+  const hasFreeShippingProduct = items.some(item => item.freeShipping)
+
+  // ─── Compute shipping based on selected country + shipping zones ────────
+  const computeShipping = useCallback(() => {
+    if (couponFreeShipping || hasFreeShippingProduct) return 0
+    if (subtotal >= 100) return 0 // free over $100 (legacy rule, kept as fallback)
+
+    // Find the matching zone for the selected country
+    const countryEntry = COUNTRIES.find((c) => c.value === selectedCountry)
+    const zoneCode = countryEntry?.zoneCode
+    if (!zoneCode) return 15
+
+    const zone = shippingZones.find((z) => z.code === zoneCode)
+    if (zone && zone.active) return zone.rate
+    // Inactive or missing zone → default flat rate
+    return 15
+  }, [selectedCountry, shippingZones, couponFreeShipping, hasFreeShippingProduct, subtotal])
+
+  const shipping = computeShipping()
+  const total = Math.max(0, subtotal - discountAmount) + shipping
 
   const [form, setForm] = useState({
     customerName: user?.name || '',
@@ -44,6 +145,50 @@ export default function CheckoutPage() {
     setForm(prev => ({ ...prev, [field]: value }))
   }
 
+  // ─── Coupon apply handler ───────────────────────────────────────────────
+  const handleApplyCoupon = async () => {
+    const code = couponInput.trim().toUpperCase()
+    if (!code) {
+      toast.error('Please enter a coupon code')
+      return
+    }
+    setValidatingCoupon(true)
+    try {
+      const res = await fetch('/api/promotions/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          couponCode: code,
+          subtotal,
+          items: items.map((i) => ({ id: i.id })),
+        }),
+      })
+      const data = await res.json()
+      if (data.success && data.valid) {
+        setAppliedPromotion(data.promotion)
+        setDiscountAmount(data.discountAmount || 0)
+        setCouponFreeShipping(data.freeShipping || false)
+        toast.success(data.message || 'Coupon applied!')
+      } else {
+        toast.error(data.message || 'Invalid coupon code')
+        setAppliedPromotion(null)
+        setDiscountAmount(0)
+        setCouponFreeShipping(false)
+      }
+    } catch (e) {
+      toast.error('Failed to validate coupon')
+    } finally {
+      setValidatingCoupon(false)
+    }
+  }
+
+  const handleRemoveCoupon = () => {
+    setAppliedPromotion(null)
+    setDiscountAmount(0)
+    setCouponFreeShipping(false)
+    setCouponInput('')
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.customerName || !form.email || !form.phone || !form.address || !form.city) {
@@ -56,7 +201,7 @@ export default function CheckoutPage() {
     setErrorMessage('')
 
     try {
-      // 1. Create the order
+      // 1. Create the order (with country + coupon code)
       const orderItems = items.map(item => ({
         id: item.id,
         name: item.name,
@@ -76,8 +221,8 @@ export default function CheckoutPage() {
           userId: user?.id || null,
           items: JSON.stringify(orderItems),
           subtotal,
-          total,
-          country: 'United States',
+          country: selectedCountry,
+          couponCode: appliedPromotion?.couponCode || undefined,
           paymentMethod: 'clover',
           paymentStatus: 'pending',
         }),
@@ -91,13 +236,10 @@ export default function CheckoutPage() {
       }
 
       // ─── Use the SERVER-RETURNED order total, not client-calculated ───
-      // The server recalculates prices from the DB (overriding any stale cart
-      // prices). Sending our client total to /api/clover/checkout would cause
-      // a mismatch. Always use the authoritative server total.
       const serverOrder = orderData.order
       const serverTotal = serverOrder.total
       const serverSubtotal = serverOrder.subtotal
-      const serverShipping = serverTotal - serverSubtotal
+      const serverShipping = serverTotal - serverSubtotal - (serverOrder.discount || 0)
 
       // 2. Create Clover hosted checkout session
       const checkoutRes = await fetch('/api/clover/checkout', {
@@ -106,7 +248,7 @@ export default function CheckoutPage() {
         body: JSON.stringify({
           orderId: serverOrder.id,
           items: orderItems,
-          subtotal: serverSubtotal,
+          subtotal: serverSubtotal - (serverOrder.discount || 0),
           shipping: serverShipping,
           total: serverTotal,
           customerEmail: form.email,
@@ -116,27 +258,20 @@ export default function CheckoutPage() {
           city: form.city,
           state: form.state,
           zipCode: form.zipCode,
-          country: 'United States',
+          country: selectedCountry,
         }),
       })
 
       const checkoutData = await checkoutRes.json()
 
       if (checkoutData.success && checkoutData.redirectUrl) {
-        // ─── DO NOT clear the cart here ─────────────────────────────────────
-        // The cart must stay intact until we KNOW the payment succeeded.
-        // If the customer cancels or their card is declined, they should be
-        // able to retry without losing their cart. The cart is cleared on the
-        // order-success page after Clover confirms the payment.
         toast.success('Redirecting to secure payment...')
         window.location.href = checkoutData.redirectUrl
       } else if (checkoutData.requiresConfig) {
-        // Clover not configured
         setRequiresConfig(true)
         setErrorMessage(checkoutData.error || 'Payment system is not configured. Please contact support.')
         setPhase('error')
       } else {
-        // Other error
         setErrorMessage(checkoutData.error || 'Failed to initiate payment. Please try again.')
         setPhase('error')
       }
@@ -316,6 +451,38 @@ export default function CheckoutPage() {
                 <CardContent className="p-6">
                   <h3 className="font-semibold text-lg mb-4">Delivery Information</h3>
                   <div className="grid sm:grid-cols-2 gap-4">
+                    {/* Country selector — drives the shipping rate */}
+                    <div className="sm:col-span-2">
+                      <Label htmlFor="country">Country / Region *</Label>
+                      <Select
+                        value={selectedCountry}
+                        onValueChange={(v) => setSelectedCountry(v)}
+                      >
+                        <SelectTrigger id="country" className="border-blush/30 mt-1">
+                          <SelectValue placeholder="Select your country" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-[60vh]">
+                          {COUNTRIES.map((c) => (
+                            <SelectItem key={c.value} value={c.value}>
+                              {c.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {(() => {
+                        const countryEntry = COUNTRIES.find((c) => c.value === selectedCountry)
+                        const zone = shippingZones.find((z) => z.code === countryEntry?.zoneCode)
+                        if (zone && zone.active && zone.estimatedDays) {
+                          return (
+                            <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1">
+                              <Truck className="w-3 h-3" />
+                              Estimated delivery: {zone.estimatedDays}
+                            </p>
+                          )
+                        }
+                        return null
+                      })()}
+                    </div>
                     <div className="sm:col-span-2">
                       <Label htmlFor="address">Address *</Label>
                       <Input id="address" value={form.address} onChange={e => handleChange('address', e.target.value)} className="border-blush/30 mt-1" required />
@@ -325,14 +492,82 @@ export default function CheckoutPage() {
                       <Input id="city" value={form.city} onChange={e => handleChange('city', e.target.value)} className="border-blush/30 mt-1" required />
                     </div>
                     <div>
-                      <Label htmlFor="state">State</Label>
+                      <Label htmlFor="state">State / Province</Label>
                       <Input id="state" value={form.state} onChange={e => handleChange('state', e.target.value)} className="border-blush/30 mt-1" />
                     </div>
                     <div>
-                      <Label htmlFor="zip">Zip Code</Label>
+                      <Label htmlFor="zip">Zip / Postal Code</Label>
                       <Input id="zip" value={form.zipCode} onChange={e => handleChange('zipCode', e.target.value)} className="border-blush/30 mt-1" />
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+
+              {/* Coupon Code */}
+              <Card className="border-blush/30">
+                <CardContent className="p-6">
+                  <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
+                    <Tag className="w-4 h-4 text-gold" />
+                    Coupon Code
+                  </h3>
+                  {appliedPromotion ? (
+                    <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-green-50 border border-green-200">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-5 h-5 text-green-600" />
+                        <div>
+                          <p className="font-medium text-sm">
+                            {appliedPromotion.couponCode}
+                            <span className="text-muted-foreground ml-2 font-normal">
+                              {appliedPromotion.type === 'percentage' && `${appliedPromotion.discount}% off`}
+                              {appliedPromotion.type === 'fixed' && `$${appliedPromotion.discount.toFixed(2)} off`}
+                              {appliedPromotion.type === 'shipping' && 'Free shipping'}
+                            </span>
+                          </p>
+                          <p className="text-xs text-muted-foreground">{appliedPromotion.name}</p>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 hover:bg-green-100"
+                        onClick={handleRemoveCoupon}
+                        title="Remove coupon"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Input
+                        value={couponInput}
+                        onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                        placeholder="ENTER CODE"
+                        className="font-mono border-blush/30"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            handleApplyCoupon()
+                          }
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        onClick={handleApplyCoupon}
+                        disabled={validatingCoupon || !couponInput.trim()}
+                        className="bg-gold hover:bg-gold/90"
+                      >
+                        {validatingCoupon ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          'Apply'
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Have a discount code? Enter it above to apply your savings at checkout.
+                  </p>
                 </CardContent>
               </Card>
 
@@ -411,8 +646,28 @@ export default function CheckoutPage() {
                     <span className="text-muted-foreground">Subtotal</span>
                     <span>${subtotal.toLocaleString()}</span>
                   </div>
+                  {discountAmount > 0 && (
+                    <div className="flex justify-between text-green-600">
+                      <span className="flex items-center gap-1">
+                        <Tag className="w-3 h-3" />
+                        Discount ({appliedPromotion?.couponCode})
+                      </span>
+                      <span>−${discountAmount.toLocaleString()}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Shipping</span>
+                    <span className="text-muted-foreground flex items-center gap-1">
+                      <Truck className="w-3 h-3" />
+                      Shipping
+                      {(() => {
+                        const zone = shippingZones.find((z) =>
+                          z.code === COUNTRIES.find((c) => c.value === selectedCountry)?.zoneCode
+                        )
+                        return zone && zone.active ? (
+                          <span className="text-[10px] text-muted-foreground/70 ml-1">({zone.name})</span>
+                        ) : null
+                      })()}
+                    </span>
                     <span>{shipping === 0 ? <span className="text-green-600">Free</span> : `$${shipping.toLocaleString()}`}</span>
                   </div>
                   <div className="border-t border-blush/30 pt-2 flex justify-between font-semibold text-base">

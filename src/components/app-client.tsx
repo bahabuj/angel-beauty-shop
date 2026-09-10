@@ -3,6 +3,7 @@
 import { useNavStore } from '@/store/nav-store'
 import { useUIStore } from '@/store/ui-store'
 import Navbar from '@/components/layout/navbar'
+import PromoMarqueeBar from '@/components/layout/promo-marquee-bar'
 import Footer from '@/components/layout/footer'
 import SeoManager from '@/components/seo/seo-manager'
 import dynamic from 'next/dynamic'
@@ -129,6 +130,7 @@ export default function AppClient({ initialHomeData }: AppClientProps) {
     <div className="min-h-screen flex flex-col">
       <SeoManager />
       {showLayout && <Navbar />}
+      {showLayout && currentPage === 'home' && <PromoMarqueeBar />}
       <main className={currentPage === 'admin' ? '' : 'flex-1'}>
         {renderPage()}
       </main>

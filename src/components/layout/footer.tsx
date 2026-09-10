@@ -46,7 +46,7 @@ export default function Footer() {
               className="text-2xl font-bold mb-2"
               style={{ fontFamily: 'var(--font-playfair), serif' }}
             >
-              Join the Angelsbeauty Family
+              Join the Angels Beauty Family
             </h3>
             <p className="text-muted-foreground text-sm mb-4">
               Subscribe to get exclusive offers, beauty tips, and new product updates.
@@ -83,20 +83,20 @@ export default function Footer() {
             <button
               onClick={handleFooterLogoClick}
               className="flex items-center gap-2 mb-4 group select-none"
-              aria-label="Angelsbeauty home"
+              aria-label="Angels Beauty home"
             >
               <Image
                 src="/images/logo.png"
-                alt="Angelsbeauty"
-                width={36}
-                height={36}
+                alt="Angels Beauty"
+                width={40}
+                height={40}
                 className="object-contain"
               />
               <h3
-                className="text-xl font-bold gold-gradient-text"
+                className="font-playfair text-3xl font-extrabold gold-gradient-text"
                 style={{ fontFamily: 'var(--font-playfair), serif' }}
               >
-                Angelsbeauty
+                Angels Beauty
               </h3>
             </button>
             <p className="text-sm text-muted-foreground mb-4">
@@ -223,7 +223,7 @@ export default function Footer() {
         <div className="border-t border-blush/40 mt-10 pt-8">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <p className="text-xs text-muted-foreground">
-              © {new Date().getFullYear()} Angelsbeauty. All rights reserved.
+              © {new Date().getFullYear()} Angels Beauty. All rights reserved.
             </p>
             <PaymentIconsRow />
           </div>

@@ -22,7 +22,7 @@ const NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET || ''
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, password } = body
+    const { email, password, rememberMe } = body
 
     if (!email || !password) {
       return NextResponse.json(
@@ -67,6 +67,11 @@ export async function POST(request: NextRequest) {
     // 3. Create a NextAuth-compatible session token using NextAuth's own encode()
     // This is critical — NextAuth derives the signing key from the secret using HKDF,
     // so we MUST use its encode() function to produce a token that getToken() can verify.
+    //
+    // Session duration:
+    //   - rememberMe=true  → 30 days (long-lived, "keep me signed in")
+    //   - rememberMe=false → 1 day (short-lived, expires when user closes browser-ish)
+    const sessionMaxAge = rememberMe === false ? 24 * 60 * 60 : 30 * 24 * 60 * 60
     const token = await encode({
       token: {
         name: user.name,
@@ -78,7 +83,7 @@ export async function POST(request: NextRequest) {
         phone: user.phone,
       },
       secret: NEXTAUTH_SECRET,
-      maxAge: 30 * 24 * 60 * 60, // 30 days — must match auth.ts session.maxAge
+      maxAge: sessionMaxAge,
     })
 
     // 4. Build the response with user data
@@ -95,13 +100,19 @@ export async function POST(request: NextRequest) {
     })
 
     // 5. Set the session cookie directly on the response
-    response.cookies.set('next-auth.session-token', token, {
+    // When rememberMe=false, omit maxAge so the cookie becomes a session cookie
+    // (deleted when the browser closes) — but we still set a 1-day expiry on the
+    // JWT itself so it can't be reused after 24h.
+    const cookieOptions: any = {
       httpOnly: true,
       sameSite: 'lax',
       path: '/',
       secure: false,
-      maxAge: 30 * 24 * 60 * 60,
-    })
+    }
+    if (rememberMe !== false) {
+      cookieOptions.maxAge = sessionMaxAge
+    }
+    response.cookies.set('next-auth.session-token', token, cookieOptions)
 
     return response
   } catch (error) {

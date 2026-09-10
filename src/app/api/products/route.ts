@@ -80,8 +80,21 @@ export async function POST(req: NextRequest) {
     if (typeof data.comparePrice === 'string') data.comparePrice = parseFloat(data.comparePrice) || null
     if (data.comparePrice === '') data.comparePrice = null
     if (typeof data.stock === 'string') data.stock = parseInt(data.stock) || 0
-    if (!data.images) data.images = '[]'
-    if (!data.benefits) data.benefits = '[]'
+    // Prisma schema stores images + benefits as String (JSON-encoded).
+    if (Array.isArray(data.images)) {
+      data.images = JSON.stringify(data.images)
+    } else if (!data.images) {
+      data.images = '[]'
+    } else if (typeof data.images !== 'string') {
+      data.images = '[]'
+    }
+    if (Array.isArray(data.benefits)) {
+      data.benefits = JSON.stringify(data.benefits)
+    } else if (!data.benefits) {
+      data.benefits = '[]'
+    } else if (typeof data.benefits !== 'string') {
+      data.benefits = '[]'
+    }
     if (!data.ingredients) data.ingredients = ''
     if (!data.howToUse) data.howToUse = ''
 

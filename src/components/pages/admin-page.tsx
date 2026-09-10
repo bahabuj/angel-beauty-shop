@@ -12,8 +12,10 @@ import AuthSlidesManagement from '@/components/admin/auth-slides-management'
 import { SettingsPage } from '@/components/admin/settings-page'
 import VisualContentManagement from '@/components/admin/visual-content-management'
 import CategoriesManagement from '@/components/admin/categories-management'
-import InspirationHubManagement from '@/components/admin/inspiration-hub-management'
 import BeforeAfterManagement from '@/components/admin/before-after-management'
+import ShippingManagement from '@/components/admin/shipping-management'
+import PromotionsManagement from '@/components/admin/promotions-management'
+import AdVideosManagement from '@/components/admin/ad-videos-management'
 import { useEffect, useState, useCallback } from 'react'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -61,7 +63,7 @@ interface Stats {
   }
 }
 
-type AdminPage = 'dashboard' | 'products' | 'categories' | 'orders' | 'banners' | 'visual-content' | 'auth-slides' | 'before-after' | 'inspiration-hub' | 'newsletter' | 'settings'
+type AdminPage = 'dashboard' | 'products' | 'categories' | 'orders' | 'banners' | 'promotions' | 'shipping' | 'ad-videos' | 'visual-content' | 'auth-slides' | 'before-after' | 'newsletter' | 'settings'
 
 const PAGE_TITLES: Record<AdminPage, string> = {
   dashboard: 'Dashboard Overview',
@@ -69,10 +71,12 @@ const PAGE_TITLES: Record<AdminPage, string> = {
   categories: 'Categories Management',
   orders: 'Orders Management',
   banners: 'Promo Banners',
+  promotions: 'Promotions',
+  shipping: 'Shipping Management',
+  'ad-videos': 'Ad Videos',
   'visual-content': 'Visual Content',
   'auth-slides': 'Auth Page Slides',
   'before-after': 'Before & After Images',
-  'inspiration-hub': 'Inspiration Hub',
   newsletter: 'Newsletter Subscribers',
   settings: 'Settings',
 }
@@ -395,12 +399,16 @@ export default function AdminPage() {
             onToggleActive={handlePromoToggle}
           />
         )
+      case 'promotions':
+        return <PromotionsManagement />
+      case 'shipping':
+        return <ShippingManagement />
       case 'visual-content':
         return <VisualContentManagement />
       case 'before-after':
         return <BeforeAfterManagement />
-      case 'inspiration-hub':
-        return <InspirationHubManagement />
+      case 'ad-videos':
+        return <AdVideosManagement />
       case 'auth-slides':
         return (
           <AuthSlidesManagement
@@ -451,6 +459,7 @@ export default function AdminPage() {
           adminEmail="admin@angelbeauty.com"
           onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
           onNavigate={handleNavigate}
+          onBackToStore={handleBackToStore}
           onLogout={handleLogout}
         />
 

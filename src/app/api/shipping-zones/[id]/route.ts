@@ -25,7 +25,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (typeof name === 'string') data.name = name.trim()
     if (typeof code === 'string') data.code = code.trim()
     if (typeof flag === 'string') data.flag = flag.trim()
-    if (typeof rate === 'number') data.rate = parseFloat(rate)
+    if (typeof rate === 'number') data.rate = rate
+    else if (typeof rate === 'string') data.rate = parseFloat(rate) || 0
     if (typeof estimatedDays === 'string') data.estimatedDays = estimatedDays.trim()
     if (typeof active === 'boolean') data.active = active
     if (typeof order === 'number') data.order = order

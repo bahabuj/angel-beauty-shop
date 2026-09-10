@@ -44,12 +44,15 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Normalize rate: accept number or numeric string
+    const rateValue = typeof rate === 'number' ? rate : parseFloat(String(rate || 0))
+
     const zone = await db.shippingZone.create({
       data: {
         name: name.trim(),
         code: finalCode,
         flag: flag?.trim() || '',
-        rate: parseFloat(rate),
+        rate: rateValue,
         estimatedDays: estimatedDays?.trim() || '',
         active: typeof active === 'boolean' ? active : true,
         order: typeof order === 'number' ? order : 0,

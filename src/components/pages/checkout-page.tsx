@@ -92,6 +92,21 @@ export default function CheckoutPage() {
   const [shippingZones, setShippingZones] = useState<ShippingZone[]>([])
   const [selectedCountry, setSelectedCountry] = useState('United States')
 
+  // ─── EasyPost live carrier rates ──────────────────────────────────────────
+  interface CarrierRate {
+    rateId: string
+    shipmentId: string
+    carrier: string
+    service: string
+    rate: number
+    deliveryDays?: number
+  }
+  const [carrierRates, setCarrierRates] = useState<CarrierRate[]>([])
+  const [selectedRateId, setSelectedRateId] = useState<string | null>(null)
+  const [easypostShipmentId, setEasypostShipmentId] = useState<string | null>(null)
+  const [fetchingRates, setFetchingRates] = useState(false)
+  const [rateError, setRateError] = useState<string | null>(null)
+
   // ─── Coupon code state ──────────────────────────────────────────────────
   const [couponInput, setCouponInput] = useState('')
   const [validatingCoupon, setValidatingCoupon] = useState(false)
@@ -99,37 +114,16 @@ export default function CheckoutPage() {
   const [discountAmount, setDiscountAmount] = useState(0)
   const [couponFreeShipping, setCouponFreeShipping] = useState(false)
 
-  // ─── Load shipping zones on mount ───────────────────────────────────────
+  // ─── Load shipping zones on mount (legacy — kept for reference) ──────────
   useEffect(() => {
     fetch('/api/shipping-zones')
       .then((r) => r.json())
-      .then((data) => {
-        if (data.success) setShippingZones(data.zones)
-      })
-      .catch((e) => console.error('Failed to load shipping zones:', e))
+      .then((data) => { if (data.success) setShippingZones(data.zones) })
+      .catch(() => {})
   }, [])
 
   const subtotal = getSubtotal()
-  const hasFreeShippingProduct = items.some(item => item.freeShipping)
-
-  // ─── Compute shipping based on selected country + shipping zones ────────
-  const computeShipping = useCallback(() => {
-    if (couponFreeShipping || hasFreeShippingProduct) return 0
-    if (subtotal >= 100) return 0 // free over $100 (legacy rule, kept as fallback)
-
-    // Find the matching zone for the selected country
-    const countryEntry = COUNTRIES.find((c) => c.value === selectedCountry)
-    const zoneCode = countryEntry?.zoneCode
-    if (!zoneCode) return 15
-
-    const zone = shippingZones.find((z) => z.code === zoneCode)
-    if (zone && zone.active) return zone.rate
-    // Inactive or missing zone → default flat rate
-    return 15
-  }, [selectedCountry, shippingZones, couponFreeShipping, hasFreeShippingProduct, subtotal])
-
-  const shipping = computeShipping()
-  const total = Math.max(0, subtotal - discountAmount) + shipping
+  const hasFreeShippingProduct = items.length > 0 && items.every(item => item.freeShipping)
 
   const [form, setForm] = useState({
     customerName: user?.name || '',
@@ -140,6 +134,44 @@ export default function CheckoutPage() {
     state: '',
     zipCode: '',
   })
+
+  // ─── Fetch live carrier rates from EasyPost ──────────────────────────────
+  const fetchShippingRates = useCallback(async () => {
+    setFetchingRates(true)
+    setRateError(null)
+    setCarrierRates([])
+    setSelectedRateId(null)
+    setEasypostShipmentId(null)
+    try {
+      const res = await fetch('/api/shipping/rates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: items.map((i) => ({ id: i.id, quantity: i.quantity })),
+          address: { street: form.address, city: form.city, state: form.state, zip: form.zipCode, country: selectedCountry },
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setCarrierRates(data.rates || [])
+        setEasypostShipmentId(data.shipmentId)
+        if (data.rates?.length > 0) setSelectedRateId(data.rates[0].rateId)
+      } else {
+        setRateError(data.error || 'Could not calculate shipping rates.')
+      }
+    } catch { setRateError('Failed to fetch shipping rates. Please try again.') }
+    finally { setFetchingRates(false) }
+  }, [items, form.address, form.city, form.state, form.zipCode, selectedCountry])
+
+  // ─── Determine shipping cost ─────────────────────────────────────────────
+  let shipping = 0
+  if (couponFreeShipping || hasFreeShippingProduct) {
+    shipping = 0
+  } else if (selectedRateId && carrierRates.length > 0) {
+    const selected = carrierRates.find((r) => r.rateId === selectedRateId)
+    if (selected) shipping = selected.rate
+  }
+  const total = Math.max(0, subtotal - discountAmount) + shipping
 
   const handleChange = (field: string, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }))
@@ -223,6 +255,8 @@ export default function CheckoutPage() {
           subtotal,
           country: selectedCountry,
           couponCode: appliedPromotion?.couponCode || undefined,
+          easypostShipmentId: easypostShipmentId || undefined,
+          easypostRateId: selectedRateId || undefined,
           paymentMethod: 'clover',
           paymentStatus: 'pending',
         }),
@@ -503,6 +537,104 @@ export default function CheckoutPage() {
                 </CardContent>
               </Card>
 
+              {/* ─── Shipping Options (EasyPost live carrier rates) ─────────── */}
+              {!hasFreeShippingProduct && !couponFreeShipping && (
+                <Card className="border-blush/30">
+                  <CardContent className="p-6">
+                    <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
+                      <Truck className="w-4 h-4 text-gold" />
+                      Shipping Options
+                    </h3>
+
+                    {/* Get Rates button */}
+                    {carrierRates.length === 0 && !fetchingRates && !rateError && (
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-3">
+                          Enter your delivery address above, then click the button to see real-time shipping rates from USPS.
+                        </p>
+                        <Button
+                          type="button"
+                          onClick={fetchShippingRates}
+                          className="bg-gold hover:bg-gold/90"
+                          disabled={!form.address || !form.city || !form.zipCode}
+                        >
+                          <Truck className="w-4 h-4 mr-2" />
+                          Get Shipping Rates
+                        </Button>
+                        {(!form.address || !form.city || !form.zipCode) && (
+                          <p className="text-xs text-muted-foreground mt-2">
+                            Fill in your address, city, and ZIP code first.
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Loading state */}
+                    {fetchingRates && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="w-4 h-4 animate-spin text-gold" />
+                        Contacting carriers for live rates…
+                      </div>
+                    )}
+
+                    {/* Error state */}
+                    {rateError && !fetchingRates && (
+                      <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+                        <p className="font-medium mb-1">Could not calculate shipping</p>
+                        <p className="text-xs">{rateError}</p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="mt-2 border-red-300 text-red-700 hover:bg-red-50"
+                          onClick={fetchShippingRates}
+                        >
+                          Try Again
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Rate options */}
+                    {carrierRates.length > 0 && !fetchingRates && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-xs text-muted-foreground">
+                            {carrierRates.length} option{carrierRates.length === 1 ? '' : 's'} available — select one:
+                          </p>
+                          <button type="button" onClick={fetchShippingRates} className="text-xs text-gold hover:underline">
+                            Refresh rates
+                          </button>
+                        </div>
+                        {carrierRates.map((r) => (
+                          <label
+                            key={r.rateId}
+                            className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                              selectedRateId === r.rateId ? 'border-gold bg-gold/10' : 'border-blush/30 hover:bg-blush/10'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="shippingRate"
+                              value={r.rateId}
+                              checked={selectedRateId === r.rateId}
+                              onChange={() => setSelectedRateId(r.rateId)}
+                              className="accent-gold"
+                            />
+                            <div className="flex-1">
+                              <p className="text-sm font-medium">{r.carrier} — {r.service}</p>
+                              {r.deliveryDays && (
+                                <p className="text-xs text-muted-foreground">Est. {r.deliveryDays} business day{r.deliveryDays === 1 ? '' : 's'}</p>
+                              )}
+                            </div>
+                            <span className="font-semibold text-gold">${r.rate.toFixed(2)}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Coupon Code */}
               <Card className="border-blush/30">
                 <CardContent className="p-6">
@@ -612,9 +744,15 @@ export default function CheckoutPage() {
               </Card>
 
               {/* Submit Button */}
-              <Button type="submit" className="w-full bg-gold hover:bg-gold-light text-white py-3 beauty-btn text-base sm:text-lg whitespace-normal break-words text-center leading-tight">
+              <Button
+                type="submit"
+                className="w-full bg-gold hover:bg-gold-light text-white py-3 beauty-btn text-base sm:text-lg whitespace-normal break-words text-center leading-tight"
+                disabled={!hasFreeShippingProduct && !couponFreeShipping && !selectedRateId && carrierRates.length === 0}
+              >
                 <Lock className="w-5 h-5 mr-2 shrink-0" />
-                Proceed to Secure Payment &mdash; ${total.toLocaleString()}
+                {!hasFreeShippingProduct && !couponFreeShipping && !selectedRateId
+                  ? 'Select a shipping option to continue'
+                  : `Proceed to Secure Payment — $${total.toLocaleString()}`}
               </Button>
             </form>
           </div>

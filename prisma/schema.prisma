@@ -63,6 +63,10 @@ model Product {
   newArrival   Boolean          @default(false)
   bestSeller   Boolean          @default(false)
   freeShipping Boolean          @default(false)
+  weight       Float?
+  length       Float?
+  width        Float?
+  height       Float?
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
   variants     ProductVariant[]
@@ -115,6 +119,13 @@ model Order {
   paymentDetails  String?   @default("{}")
   invoiceNumber   String?
   invoiceSent     Boolean  @default(false)
+  easypostShipmentId  String?
+  easypostRateId      String?
+  selectedCarrier      String?
+  selectedService      String?
+  trackingNumber       String?
+  labelUrl             String?
+  shippedAt            DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
@@ -276,4 +287,25 @@ model AdVideo {
   order       Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model CustomContent {
+  id              String   @id @default(cuid())
+  title           String
+  content         String
+  position        String   @default("homepage-top")
+  textColor       String   @default("#3D2C2E")
+  backgroundColor String   @default("#FFF8F0")
+  fontFamily      String   @default("Inter")
+  fontSize        Int      @default(16)
+  fontWeight      String   @default("normal")
+  fontStyle       String   @default("normal")
+  textAlign       String   @default("center")
+  paddingY        Int      @default(16)
+  paddingX        Int      @default(24)
+  borderRadius    Int      @default(12)
+  active          Boolean  @default(true)
+  order           Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }

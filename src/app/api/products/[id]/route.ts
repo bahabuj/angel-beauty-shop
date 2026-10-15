@@ -71,6 +71,17 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     data.bestSeller = data.bestSeller === true
     data.freeShipping = data.freeShipping === true
 
+    // ── Shipping fields (EasyPost) ──
+    const toNullableFloat = (v: any): number | null => {
+      if (v == null || v === '') return null
+      const n = typeof v === 'number' ? v : parseFloat(String(v))
+      return !isNaN(n) && n > 0 ? n : null
+    }
+    if (data.weight !== undefined) data.weight = toNullableFloat(data.weight)
+    if (data.length !== undefined) data.length = toNullableFloat(data.length)
+    if (data.width !== undefined) data.width = toNullableFloat(data.width)
+    if (data.height !== undefined) data.height = toNullableFloat(data.height)
+
     const product = await db.$transaction(async (tx) => {
       const updated = await tx.product.update({ where: { id }, data })
 

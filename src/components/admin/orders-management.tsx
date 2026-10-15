@@ -80,6 +80,7 @@ interface OrdersManagementProps {
     phone: string | null
     total: number
     subtotal: number
+    shippingRate?: number
     status: string
     items: string
     address: string
@@ -91,6 +92,13 @@ interface OrdersManagementProps {
     invoiceNumber: string | null
     invoiceSent: boolean
     createdAt: string
+    easypostShipmentId?: string | null
+    easypostRateId?: string | null
+    selectedCarrier?: string | null
+    selectedService?: string | null
+    trackingNumber?: string | null
+    labelUrl?: string | null
+    shippedAt?: string | null
   }>
   onUpdateStatus: (id: string, status: string) => Promise<void>
 }
@@ -832,6 +840,65 @@ export function OrdersManagement({ orders, onUpdateStatus }: OrdersManagementPro
                     </div>
                   </div>
 
+                  {/* ─── Shipping & Label (EasyPost) ────────────────────────────── */}
+                  <div>
+                    <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                      <div className="h-1.5 w-1.5 rounded-full bg-gold" />
+                      Shipping & Label
+                    </h4>
+                    <div className="rounded-lg bg-blush/30 p-4 space-y-3">
+                      {selectedOrder.selectedCarrier ? (
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Carrier / Service</p>
+                            <p className="text-sm font-medium text-foreground">{selectedOrder.selectedCarrier} — {selectedOrder.selectedService || '—'}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Shipping Cost</p>
+                            <p className="text-sm font-medium text-foreground">{selectedOrder.shippingRate != null ? formatCurrency(selectedOrder.shippingRate) : '—'}</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No carrier rate (free shipping or legacy order).</p>
+                      )}
+                      {selectedOrder.easypostShipmentId && (
+                        <div className="text-xs text-muted-foreground border-t border-blush/30 pt-2">
+                          <span className="font-medium">EasyPost:</span>{' '}
+                          <code className="text-[10px] bg-blush/40 px-1.5 py-0.5 rounded">{selectedOrder.easypostShipmentId}</code>
+                        </div>
+                      )}
+                      {selectedOrder.trackingNumber && (
+                        <div className="border-t border-blush/30 pt-2">
+                          <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Tracking Number</p>
+                          <p className="text-sm font-medium text-foreground">{selectedOrder.trackingNumber}</p>
+                        </div>
+                      )}
+                      {selectedOrder.labelUrl && (
+                        <div className="border-t border-blush/30 pt-2">
+                          <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Shipping Label</p>
+                          <a href={selectedOrder.labelUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-gold hover:underline flex items-center gap-1">
+                            <Download className="w-3 h-3" /> View / Print Label
+                          </a>
+                        </div>
+                      )}
+                      <div className="border-t border-blush/30 pt-3 flex flex-wrap gap-2">
+                        {selectedOrder.easypostShipmentId && !selectedOrder.labelUrl && (
+                          <BuyLabelButton orderId={selectedOrder.id} />
+                        )}
+                        {selectedOrder.status !== 'shipped' && selectedOrder.status !== 'delivered' && (
+                          <Button size="sm" variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-50" onClick={() => handleStatusUpdate(selectedOrder.id, 'shipped')}>
+                            <Truck className="w-3.5 h-3.5 mr-1" /> Mark as Shipped
+                          </Button>
+                        )}
+                        {selectedOrder.status === 'shipped' && (
+                          <Button size="sm" variant="outline" className="border-green-300 text-green-700 hover:bg-green-50" onClick={() => handleStatusUpdate(selectedOrder.id, 'delivered')}>
+                            <CheckCircle className="w-3.5 h-3.5 mr-1" /> Mark as Delivered
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Invoice Section */}
                   <div>
                     <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
@@ -988,6 +1055,30 @@ export function OrdersManagement({ orders, onUpdateStatus }: OrdersManagementPro
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+// ─── BuyLabelButton — purchases a shipping label via EasyPost ──────────────
+function BuyLabelButton({ orderId }: { orderId: string }) {
+  const [buying, setBuying] = useState(false)
+  const handleBuy = async () => {
+    if (!confirm('Purchase a shipping label for this order? This will charge your EasyPost account.')) return
+    setBuying(true)
+    try {
+      const res = await fetch('/api/shipping/label', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderId }) })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('Label purchased! Tracking: ' + (data.label?.trackingCode || 'N/A'))
+        setTimeout(() => window.location.reload(), 1500)
+      } else { toast.error(data.error || 'Failed to purchase label.') }
+    } catch { toast.error('Failed to purchase label.') }
+    finally { setBuying(false) }
+  }
+  return (
+    <Button size="sm" className="bg-gold hover:bg-gold/90" onClick={handleBuy} disabled={buying}>
+      {buying ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Package className="w-3.5 h-3.5 mr-1" />}
+      {buying ? 'Purchasing…' : 'Buy Shipping Label'}
+    </Button>
   )
 }
 

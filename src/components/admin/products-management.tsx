@@ -19,6 +19,7 @@ import {
   Upload,
   Loader2,
   Layers,
+  Truck,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -99,6 +100,11 @@ interface Product {
   featured: boolean
   newArrival: boolean
   bestSeller: boolean
+  freeShipping: boolean
+  weight: number | null
+  length: number | null
+  width: number | null
+  height: number | null
   variants?: Variant[]
 }
 
@@ -139,6 +145,11 @@ interface ProductForm {
   bestSeller: boolean
   images: string[]
   variants: VariantFormRow[]
+  weightOz: string
+  lengthIn: string
+  widthIn: string
+  heightIn: string
+  freeShipping: boolean
 }
 
 const ITEMS_PER_PAGE = 10
@@ -168,6 +179,11 @@ const EMPTY_FORM: ProductForm = {
   bestSeller: false,
   images: [],
   variants: [makeDefaultVariantRow()],
+  weightOz: '',
+  lengthIn: '',
+  widthIn: '',
+  heightIn: '',
+  freeShipping: false,
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -527,6 +543,11 @@ export default function ProductsManagement({
       bestSeller: product.bestSeller,
       images: parseImagesToArray(product.images),
       variants: variantRows,
+      weightOz: product.weight != null ? String(product.weight) : '',
+      lengthIn: product.length != null ? String(product.length) : '',
+      widthIn: product.width != null ? String(product.width) : '',
+      heightIn: product.height != null ? String(product.height) : '',
+      freeShipping: product.freeShipping ?? false,
     })
     setIsEdit(true)
     setEditingId(product.id)
@@ -610,7 +631,12 @@ export default function ProductsManagement({
       featured: form.featured,
       newArrival: form.newArrival,
       bestSeller: form.bestSeller,
+      freeShipping: form.freeShipping,
       images: JSON.stringify(form.images),
+      weight: form.weightOz.trim() ? parseFloat(form.weightOz) : null,
+      length: form.lengthIn.trim() ? parseFloat(form.lengthIn) : null,
+      width: form.widthIn.trim() ? parseFloat(form.widthIn) : null,
+      height: form.heightIn.trim() ? parseFloat(form.heightIn) : null,
       // price/stock are denormalized caches — the API recomputes them from
       // variants. We send placeholder values that the backend will overwrite.
       price: variantsPayload[0].price,
@@ -1497,6 +1523,58 @@ export default function ProductsManagement({
                 </div>
               </label>
             </div>
+          </div>
+
+          {/* ─── Shipping Information (EasyPost) ────────────────────────────── */}
+          <div className="rounded-lg border border-blush/30 p-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-sm font-semibold flex items-center gap-2">
+                  <Truck className="w-4 h-4 text-gold" />
+                  Shipping Information
+                </h4>
+                <p className="text-xs text-muted-foreground mt-0.5">Required for live carrier rates (USPS)</p>
+              </div>
+              {!form.freeShipping && (
+                form.weightOz.trim() === '' || form.lengthIn.trim() === '' || form.widthIn.trim() === '' || form.heightIn.trim() === '' ? (
+                  <span className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700 border border-amber-300">⚠ Incomplete</span>
+                ) : (
+                  <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 border border-green-300">✓ Ready</span>
+                )
+              )}
+            </div>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <Switch checked={form.freeShipping} onCheckedChange={(v) => updateForm({ freeShipping: v })} className="data-[state=checked]:bg-gold" />
+              <div>
+                <span className="text-sm font-medium">Free Shipping</span>
+                <p className="text-xs text-muted-foreground">Skip carrier rates — customer pays $0</p>
+              </div>
+            </label>
+            {!form.freeShipping && (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div>
+                    <Label htmlFor="weightOz" className="text-xs">Weight (oz)</Label>
+                    <Input id="weightOz" type="number" step="0.1" min="0" value={form.weightOz} onChange={(e) => updateForm({ weightOz: e.target.value })} placeholder="8" className="mt-1" />
+                  </div>
+                  <div>
+                    <Label htmlFor="lengthIn" className="text-xs">Length (in)</Label>
+                    <Input id="lengthIn" type="number" step="0.1" min="0" value={form.lengthIn} onChange={(e) => updateForm({ lengthIn: e.target.value })} placeholder="6" className="mt-1" />
+                  </div>
+                  <div>
+                    <Label htmlFor="widthIn" className="text-xs">Width (in)</Label>
+                    <Input id="widthIn" type="number" step="0.1" min="0" value={form.widthIn} onChange={(e) => updateForm({ widthIn: e.target.value })} placeholder="4" className="mt-1" />
+                  </div>
+                  <div>
+                    <Label htmlFor="heightIn" className="text-xs">Height (in)</Label>
+                    <Input id="heightIn" type="number" step="0.1" min="0" value={form.heightIn} onChange={(e) => updateForm({ heightIn: e.target.value })} placeholder="2" className="mt-1" />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Products with missing shipping info are <strong>not eligible for live carrier rates</strong> and will block checkout.
+                </p>
+              </>
+            )}
           </div>
 
           <DialogFooter className="gap-2 sm:gap-0">

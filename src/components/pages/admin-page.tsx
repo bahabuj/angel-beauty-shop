@@ -16,6 +16,7 @@ import BeforeAfterManagement from '@/components/admin/before-after-management'
 import ShippingManagement from '@/components/admin/shipping-management'
 import PromotionsManagement from '@/components/admin/promotions-management'
 import AdVideosManagement from '@/components/admin/ad-videos-management'
+import BulkShippingEditor from '@/components/admin/bulk-shipping-editor'
 import { useEffect, useState, useCallback } from 'react'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -26,6 +27,7 @@ interface Product {
   comparePrice: number | null; categorySlug: string; images: string; stock: number
   benefits: string; ingredients: string; howToUse: string
   featured: boolean; newArrival: boolean; bestSeller: boolean; createdAt: string
+  freeShipping: boolean; weight: number | null; length: number | null; width: number | null; height: number | null
 }
 
 interface Order {
@@ -33,6 +35,8 @@ interface Order {
   status: string; customerName: string; email: string; phone: string | null
   address: string; city: string; state: string | null; zipCode: string | null
   country: string; paymentMethod: string; invoiceNumber: string | null; invoiceSent: boolean; createdAt: string
+  shippingRate?: number; easypostShipmentId?: string | null; easypostRateId?: string | null
+  selectedCarrier?: string | null; selectedService?: string | null; trackingNumber?: string | null; labelUrl?: string | null; shippedAt?: string | null
 }
 
 interface Subscriber { id: string; email: string; createdAt: string }
@@ -63,7 +67,7 @@ interface Stats {
   }
 }
 
-type AdminPage = 'dashboard' | 'products' | 'categories' | 'orders' | 'banners' | 'promotions' | 'shipping' | 'ad-videos' | 'visual-content' | 'auth-slides' | 'before-after' | 'newsletter' | 'settings'
+type AdminPage = 'dashboard' | 'products' | 'categories' | 'orders' | 'banners' | 'promotions' | 'shipping' | 'bulk-shipping' | 'ad-videos' | 'content-studio' | 'visual-content' | 'auth-slides' | 'before-after' | 'newsletter' | 'settings'
 
 const PAGE_TITLES: Record<AdminPage, string> = {
   dashboard: 'Dashboard Overview',
@@ -73,7 +77,9 @@ const PAGE_TITLES: Record<AdminPage, string> = {
   banners: 'Promo Banners',
   promotions: 'Promotions',
   shipping: 'Shipping Management',
+  'bulk-shipping': 'Bulk Shipping Editor',
   'ad-videos': 'Ad Videos',
+  'content-studio': 'Content Studio',
   'visual-content': 'Visual Content',
   'auth-slides': 'Auth Page Slides',
   'before-after': 'Before & After Images',
@@ -403,6 +409,8 @@ export default function AdminPage() {
         return <PromotionsManagement />
       case 'shipping':
         return <ShippingManagement />
+      case 'bulk-shipping':
+        return <BulkShippingEditor />
       case 'visual-content':
         return <VisualContentManagement />
       case 'before-after':

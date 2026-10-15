@@ -44,6 +44,7 @@ const navItems = [
   { id: 'banners', label: 'Promo Banners', icon: Megaphone },
   { id: 'promotions', label: 'Promotions', icon: Ticket },
   { id: 'shipping', label: 'Shipping Management', icon: Truck },
+  { id: 'bulk-shipping', label: 'Bulk Shipping Editor', icon: Truck },
   { id: 'ad-videos', label: 'Ad Videos', icon: Video },
   { id: 'visual-content', label: 'Visual Content', icon: Palette },
   { id: 'auth-slides', label: 'Auth Page Slides', icon: ImagePlay },

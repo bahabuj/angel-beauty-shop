@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { getSiteUrl } from '@/lib/utils'
+import { getRateById, isEasyPostConfigured, EasyPostConfigError, EasyPostAPIError } from '@/lib/easypost'
 
 // ─── GET /api/orders ──────────────────────────────────────────────────────────
 // Returns orders sorted by creation date (newest first).
@@ -274,34 +275,92 @@ export async function POST(req: NextRequest) {
 
     const discountedSubtotal = Math.max(0, subtotal - discount)
 
-    // ─── 6. Calculate shipping ───────────────────────────────────────────
-    const hasFreeShippingProduct = products.some((p) => p.freeShipping)
+    // ─── 6. Calculate shipping — EasyPost real-time rates (no flat-rate fallback) ──
+    const hasFreeShippingProduct = items.every((item: OrderItem) => {
+      const product = productMap.get(item.id)
+      return product?.freeShipping === true
+    })
     const country = data.country || 'United States'
 
     let shipping = 0
     let shippingZoneCode: string | null = null
+    let easypostShipmentId: string | null = null
+    let easypostRateId: string | null = null
+    let selectedCarrier: string | null = null
+    let selectedService: string | null = null
 
-    if (freeShippingFromPromo || hasFreeShippingProduct || discountedSubtotal >= 100) {
+    if (freeShippingFromPromo || hasFreeShippingProduct) {
       shipping = 0
     } else {
-      // Look up shipping zone by country
-      const zoneCode = matchShippingZoneCode(country)
-      if (zoneCode) {
-        const zone = await db.shippingZone.findUnique({ where: { code: zoneCode } })
-        if (zone && zone.active) {
-          shipping = zone.rate
-          shippingZoneCode = zone.code
-        } else if (zone && !zone.active) {
-          // Zone exists but inactive — fall back to default
-          shipping = 15
-          shippingZoneCode = zone.code
-        } else {
-          // No matching zone — default flat rate
-          shipping = 15
-        }
-      } else {
-        shipping = 15
+      // ── Real-time carrier rate required ──────────────────────────────────
+      if (!isEasyPostConfigured()) {
+        console.error('[Orders] Rejected: EasyPost not configured, no fallback to flat rates')
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Shipping calculation is not available right now. Please try again later or contact support.',
+            code: 'SHIPPING_NOT_CONFIGURED',
+          },
+          { status: 503 }
+        )
       }
+
+      const shipmentId = data.easypostShipmentId
+      const rateId = data.easypostRateId
+
+      if (!shipmentId || !rateId) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Please select a shipping option before placing your order.',
+            code: 'NO_SHIPPING_RATE_SELECTED',
+          },
+          { status: 400 }
+        )
+      }
+
+      // Server-side re-validation: fetch the rate from EasyPost by ID
+      let verifiedRate
+      try {
+        verifiedRate = await getRateById(shipmentId, rateId)
+      } catch (err: any) {
+        if (err instanceof EasyPostConfigError) {
+          return NextResponse.json(
+            { success: false, error: 'Shipping calculation is not configured.', code: 'SHIPPING_NOT_CONFIGURED' },
+            { status: 503 }
+          )
+        }
+        if (err instanceof EasyPostAPIError) {
+          console.error('[Orders] EasyPost API error:', err.message)
+          return NextResponse.json(
+            { success: false, error: 'Could not verify the selected shipping rate. Please refresh and try again.', code: 'RATE_VERIFICATION_FAILED' },
+            { status: 502 }
+          )
+        }
+        console.error('[Orders] Unexpected error:', err?.message || err)
+        return NextResponse.json(
+          { success: false, error: 'Could not verify the selected shipping rate. Please try again.', code: 'RATE_VERIFICATION_FAILED' },
+          { status: 500 }
+        )
+      }
+
+      if (!verifiedRate) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'The selected shipping rate is no longer available. Please refresh and choose a shipping option again.',
+            code: 'RATE_NOT_FOUND',
+          },
+          { status: 400 }
+        )
+      }
+
+      shipping = verifiedRate.rate
+      easypostShipmentId = verifiedRate.shipmentId
+      easypostRateId = verifiedRate.rateId
+      selectedCarrier = verifiedRate.carrier
+      selectedService = verifiedRate.service
+      shippingZoneCode = null
     }
 
     const total = discountedSubtotal + shipping
@@ -328,6 +387,10 @@ export async function POST(req: NextRequest) {
         shippingZoneCode,
         promotionId,
         couponCode,
+        easypostShipmentId,
+        easypostRateId,
+        selectedCarrier,
+        selectedService,
         total,
         // Always force pending — client cannot override these
         paymentStatus: 'pending',

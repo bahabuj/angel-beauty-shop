@@ -41,41 +41,43 @@ interface AppliedPromotion {
   freeShipping: boolean
 }
 
-// Country list matching the 11 shipping zones. The value is what gets sent
-// to /api/orders as `country`; the server matches it back to a zone code.
+// Country list for the checkout dropdown.
+// value = display name sent to /api/orders as `country`
+// code = ISO 3166-1 alpha-2 code sent to EasyPost as `country` in the address
+// zoneCode = legacy shipping zone code (unused with EasyPost but kept for reference)
 const COUNTRIES = [
-  { value: 'United States',         label: '🇺🇸 United States',         zoneCode: 'US' },
-  { value: 'Canada',                label: '🇨🇦 Canada',                zoneCode: 'CA' },
-  { value: 'Mexico',                label: '🇲🇽 Mexico',                zoneCode: 'MX' },
-  { value: 'United Kingdom',        label: '🇬🇧 United Kingdom',        zoneCode: 'UK' },
-  { value: 'Ireland',               label: '🇮🇪 Ireland',               zoneCode: 'UK' },
-  { value: 'Germany',               label: '🇩🇪 Germany',               zoneCode: 'EU' },
-  { value: 'France',                label: '🇫🇷 France',                zoneCode: 'EU' },
-  { value: 'Spain',                 label: '🇪🇸 Spain',                 zoneCode: 'EU' },
-  { value: 'Italy',                 label: '🇮🇹 Italy',                 zoneCode: 'EU' },
-  { value: 'Netherlands',           label: '🇳🇱 Netherlands',           zoneCode: 'EU' },
-  { value: 'Nigeria',               label: '🇳🇬 Nigeria',               zoneCode: 'AF' },
-  { value: 'Ghana',                 label: '🇬🇭 Ghana',                 zoneCode: 'AF' },
-  { value: 'Kenya',                 label: '🇰🇪 Kenya',                 zoneCode: 'AF' },
-  { value: 'South Africa',          label: '🇿🇦 South Africa',          zoneCode: 'AF' },
-  { value: 'Egypt',                 label: '🇪🇬 Egypt',                 zoneCode: 'AF' },
-  { value: 'Morocco',               label: '🇲🇦 Morocco',               zoneCode: 'AF' },
-  { value: 'China',                 label: '🇨🇳 China',                 zoneCode: 'AS' },
-  { value: 'Japan',                 label: '🇯🇵 Japan',                 zoneCode: 'AS' },
-  { value: 'South Korea',           label: '🇰🇷 South Korea',           zoneCode: 'AS' },
-  { value: 'India',                 label: '🇮🇳 India',                 zoneCode: 'AS' },
-  { value: 'Indonesia',             label: '🇮🇩 Indonesia',             zoneCode: 'AS' },
-  { value: 'Philippines',           label: '🇵🇭 Philippines',           zoneCode: 'AS' },
-  { value: 'Australia',             label: '🇦🇺 Australia',             zoneCode: 'AU' },
-  { value: 'New Zealand',           label: '🇳🇿 New Zealand',           zoneCode: 'AU' },
-  { value: 'Brazil',                label: '🇧🇷 Brazil',                zoneCode: 'SA' },
-  { value: 'Argentina',             label: '🇦🇷 Argentina',             zoneCode: 'SA' },
-  { value: 'Colombia',              label: '🇨🇴 Colombia',              zoneCode: 'SA' },
-  { value: 'Saudi Arabia',          label: '🇸🇦 Saudi Arabia',          zoneCode: 'ME' },
-  { value: 'UAE',                   label: '🇦🇪 United Arab Emirates',  zoneCode: 'ME' },
-  { value: 'Qatar',                 label: '🇶🇦 Qatar',                 zoneCode: 'ME' },
-  { value: 'Turkey',                label: '🇹🇷 Turkey',                zoneCode: 'ME' },
-  { value: 'Other',                 label: '🌐 Other',                  zoneCode: 'OTH' },
+  { value: 'United States',         label: '🇺🇸 United States',         code: 'US', zoneCode: 'US' },
+  { value: 'Canada',                label: '🇨🇦 Canada',                code: 'CA', zoneCode: 'CA' },
+  { value: 'Mexico',                label: '🇲🇽 Mexico',                code: 'MX', zoneCode: 'MX' },
+  { value: 'United Kingdom',        label: '🇬🇧 United Kingdom',        code: 'GB', zoneCode: 'UK' },
+  { value: 'Ireland',               label: '🇮🇪 Ireland',               code: 'IE', zoneCode: 'UK' },
+  { value: 'Germany',               label: '🇩🇪 Germany',               code: 'DE', zoneCode: 'EU' },
+  { value: 'France',                label: '🇫🇷 France',                code: 'FR', zoneCode: 'EU' },
+  { value: 'Spain',                 label: '🇪🇸 Spain',                 code: 'ES', zoneCode: 'EU' },
+  { value: 'Italy',                 label: '🇮🇹 Italy',                 code: 'IT', zoneCode: 'EU' },
+  { value: 'Netherlands',           label: '🇳🇱 Netherlands',           code: 'NL', zoneCode: 'EU' },
+  { value: 'Nigeria',               label: '🇳🇬 Nigeria',               code: 'NG', zoneCode: 'AF' },
+  { value: 'Ghana',                 label: '🇬🇭 Ghana',                 code: 'GH', zoneCode: 'AF' },
+  { value: 'Kenya',                 label: '🇰🇪 Kenya',                 code: 'KE', zoneCode: 'AF' },
+  { value: 'South Africa',          label: '🇿🇦 South Africa',          code: 'ZA', zoneCode: 'AF' },
+  { value: 'Egypt',                 label: '🇪🇬 Egypt',                 code: 'EG', zoneCode: 'AF' },
+  { value: 'Morocco',               label: '🇲🇦 Morocco',               code: 'MA', zoneCode: 'AF' },
+  { value: 'China',                 label: '🇨🇳 China',                 code: 'CN', zoneCode: 'AS' },
+  { value: 'Japan',                 label: '🇯🇵 Japan',                 code: 'JP', zoneCode: 'AS' },
+  { value: 'South Korea',           label: '🇰🇷 South Korea',           code: 'KR', zoneCode: 'AS' },
+  { value: 'India',                 label: '🇮🇳 India',                 code: 'IN', zoneCode: 'AS' },
+  { value: 'Indonesia',             label: '🇮🇩 Indonesia',             code: 'ID', zoneCode: 'AS' },
+  { value: 'Philippines',           label: '🇵🇭 Philippines',           code: 'PH', zoneCode: 'AS' },
+  { value: 'Australia',             label: '🇦🇺 Australia',             code: 'AU', zoneCode: 'AU' },
+  { value: 'New Zealand',           label: '🇳🇿 New Zealand',           code: 'NZ', zoneCode: 'AU' },
+  { value: 'Brazil',                label: '🇧🇷 Brazil',                code: 'BR', zoneCode: 'SA' },
+  { value: 'Argentina',             label: '🇦🇷 Argentina',             code: 'AR', zoneCode: 'SA' },
+  { value: 'Colombia',              label: '🇨🇴 Colombia',              code: 'CO', zoneCode: 'SA' },
+  { value: 'Saudi Arabia',          label: '🇸🇦 Saudi Arabia',          code: 'SA', zoneCode: 'ME' },
+  { value: 'UAE',                   label: '🇦🇪 United Arab Emirates',  code: 'AE', zoneCode: 'ME' },
+  { value: 'Qatar',                 label: '🇶🇦 Qatar',                 code: 'QA', zoneCode: 'ME' },
+  { value: 'Turkey',                label: '🇹🇷 Turkey',                code: 'TR', zoneCode: 'ME' },
+  { value: 'Other',                 label: '🌐 Other',                  code: 'XX', zoneCode: 'OTH' },
 ]
 
 export default function CheckoutPage() {
@@ -148,7 +150,13 @@ export default function CheckoutPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           items: items.map((i) => ({ id: i.id, quantity: i.quantity })),
-          address: { street: form.address, city: form.city, state: form.state, zip: form.zipCode, country: selectedCountry },
+          address: {
+            street: form.address,
+            city: form.city,
+            state: form.state,
+            zip: form.zipCode,
+            country: COUNTRIES.find((c) => c.value === selectedCountry)?.code || 'US',
+          },
         }),
       })
       const data = await res.json()
@@ -806,7 +814,13 @@ export default function CheckoutPage() {
                         ) : null
                       })()}
                     </span>
-                    <span>{shipping === 0 ? <span className="text-green-600">Free</span> : `$${shipping.toLocaleString()}`}</span>
+                    {couponFreeShipping || hasFreeShippingProduct ? (
+                      <span className="text-green-600">Free</span>
+                    ) : shipping > 0 ? (
+                      <span>${shipping.toLocaleString()}</span>
+                    ) : (
+                      <span className="text-muted-foreground text-xs italic">Select a rate</span>
+                    )}
                   </div>
                   <div className="border-t border-blush/30 pt-2 flex justify-between font-semibold text-base">
                     <span>Total</span>

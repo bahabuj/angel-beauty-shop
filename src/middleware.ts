@@ -66,6 +66,7 @@ export async function middleware(request: NextRequest) {
     method === 'POST' && (
       pathname === '/api/orders' ||            // customers place orders
       pathname === '/api/newsletter' ||         // customers subscribe
+      pathname === '/api/contact' ||            // customers submit contact form
       pathname.startsWith('/api/auth/') ||      // login/signup/session
       pathname === '/api/clover/checkout' ||    // customers checkout
       pathname === '/api/clover/return' ||      // Clover redirect

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { readFile } from 'fs/promises'
 import path from 'path'
+import { sendEmail, isEmailConfigured } from '@/lib/email'
 
 interface EmailPayload {
   orderId: string
@@ -92,34 +93,37 @@ export async function POST(req: NextRequest) {
       ],
     }
 
-    // Mark invoice as sent in database
-    await db.order.update({
-      where: { id: orderId },
-      data: { invoiceSent: true },
+    // ── Send email via Resend ──────────────────────────────────────────
+    const result = await sendEmail({
+      to: customerEmail,
+      subject: `Invoice ${invoiceNumber} from Angel Beauty`,
+      html: emailData.html,
+      attachments: [{ filename: `${invoiceNumber}.pdf`, content: pdfBuffer }],
     })
 
-    // In a production environment, you would send the email here using a service like:
-    // - SendGrid: await sendgrid.send(emailData)
-    // - Nodemailer: await transporter.sendMail(emailData)
-    // - AWS SES: await ses.sendEmail(emailData)
-    
-    // For this implementation, we save the email data for logging and provide the PDF
-    if (process.env.CLOVER_DEBUG === 'true') {
-      console.log(`📧 Invoice email prepared for ${customerEmail}:`)
-      console.log(`   Subject: ${emailData.subject}`)
-      console.log(`   Attachment: ${fileName} (${pdfBuffer.length} bytes)`)
-      console.log(`   Invoice marked as sent in database`)
+    // ── Only mark invoiceSent=true after email provider confirms acceptance ──
+    if (result.success) {
+      await db.order.update({
+        where: { id: orderId },
+        data: { invoiceSent: true },
+      })
+
+      if (process.env.CLOVER_DEBUG === 'true') {
+        console.log(`[Invoice] Email sent to ${customerEmail} | messageId: ${result.messageId}`)
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `Invoice sent to ${customerEmail}`,
+      })
+    } else {
+      // Email failed — do NOT mark as sent
+      console.error('[Invoice] Email send failed:', result.error)
+      return NextResponse.json({
+        success: false,
+        error: `Failed to send email: ${result.error || 'Unknown error'}`,
+      }, { status: 500 })
     }
-
-    return NextResponse.json({
-      success: true,
-      message: `Invoice sent to ${customerEmail}`,
-      emailPreview: {
-        to: customerEmail,
-        subject: emailData.subject,
-        attachmentSize: `${(pdfBuffer.length / 1024).toFixed(1)} KB`,
-      },
-    })
   } catch (error) {
     console.error('Invoice send error:', error)
     return NextResponse.json({ success: false, error: 'Failed to send invoice email' }, { status: 500 })

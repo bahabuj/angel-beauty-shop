@@ -175,42 +175,95 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Could not calculate package weight or dimensions.', code: 'BAD_REQUEST' }, { status: 400 })
     }
 
-    // Add 25% void space for packing material, cushioning, and irregular shapes.
-    // 20% is minimum for void fill; 25% is safer for mixed product types
-    // (bottles, soaps, creams, sets — all have different shapes that don't
-    // nest perfectly).
-    const packedVolume = totalVolumeCubicIn * 1.25
+    // ─── Packaging Selection ──────────────────────────────────────────────
+    // Three packaging options defined by the client:
+    //   Envelope:  9.5 × 12.5 × [thickness configurable via env] inches
+    //   Small Box: 11.25 × 8.75 × 6 inches
+    //   Big Box:   12.25 × 12 × 6 inches
+    //
+    // Selection logic:
+    //   1. Add 25% void space to the total item volume (packing material)
+    //   2. Try each package in order of increasing size
+    //   3. A package fits if:
+    //      a) Its volume >= packed item volume
+    //      b) Each of its dimensions >= the max item dimension on that axis
+    //   4. If no package fits, return a clear error (not a fabricated dimension)
+    //
+    // Envelope thickness is configurable via ENVELOPE_THICKNESS_IN env var.
+    // If not set, the envelope is skipped (cannot determine fit without thickness).
+    //
+    const ENVELOPE_THICKNESS = parseFloat(process.env.ENVELOPE_THICKNESS_IN || '0')
+    const PACKAGES = [
+      { name: 'Envelope',  length: 12.5, width: 9.5,  height: ENVELOPE_THICKNESS, enabled: ENVELOPE_THICKNESS > 0 },
+      { name: 'Small Box', length: 11.25, width: 8.75, height: 6,    enabled: true },
+      { name: 'Big Box',   length: 12.25, width: 12,   height: 6,    enabled: true },
+    ].filter(p => p.enabled)
 
-    // Derive box dimensions from packed volume.
-    // Use a 1.3:1:0.7 aspect ratio (typical shipping box proportions).
-    const cubeRoot = Math.cbrt(packedVolume)
-
-    // Each axis must be at least as large as the biggest item on that axis,
-    // AND at least as large as the volumetric calculation suggests.
-    // This handles both "single large item" and "many small items" cases.
-    let boxLength = Math.max(maxItemLength, cubeRoot * 1.3)
-    let boxWidth = Math.max(maxItemWidth, cubeRoot * 0.9, 4)   // min 4" for handling
-    let boxHeight = Math.max(maxItemHeight, cubeRoot * 0.7, 2)  // min 2" for padding
-
-    // For multi-item orders (3+ items), add extra width/height since items
-    // don't nest perfectly — bottles are cylindrical, boxes are rectangular,
-    // sets are irregular. Add 1 inch per 3 extra items.
-    if (totalItemCount > 2) {
-      const extraPerAxis = Math.ceil((totalItemCount - 2) / 3)
-      boxWidth += extraPerAxis
-      boxHeight += extraPerAxis
+    if (PACKAGES.length === 0) {
+      return NextResponse.json({
+        success: false,
+        error: 'No packaging options are configured. Please contact support.',
+        code: 'NO_PACKAGING',
+      }, { status: 503 })
     }
 
-    // Round up to nearest inch
-    boxLength = Math.ceil(boxLength)
-    boxWidth = Math.ceil(boxWidth)
-    boxHeight = Math.ceil(boxHeight)
+    const packedVolume = totalVolumeCubicIn * 1.25 // 25% void space
+    let selectedPackage: { name: string; length: number; width: number; height: number } | null = null
+
+    // Sort packages by volume (smallest first) to find the smallest that fits
+    const sortedPackages = [...PACKAGES].sort((a, b) =>
+      (a.length * a.width * a.height) - (b.length * b.width * b.height)
+    )
+
+    for (const pkg of sortedPackages) {
+      const pkgVolume = pkg.length * pkg.width * pkg.height
+      // Check volume fit
+      if (pkgVolume < packedVolume) continue
+      // Check dimension fit — the max item dimension on each axis must fit
+      // within the package's dimensions (on any orientation)
+      const pkgDims = [pkg.length, pkg.width, pkg.height].sort((a, b) => b - a)
+      const itemDims = [maxItemLength, maxItemWidth, maxItemHeight].sort((a, b) => b - a)
+      // Largest item dimension must fit in largest package dimension, etc.
+      if (itemDims[0] > pkgDims[0] || itemDims[1] > pkgDims[1] || itemDims[2] > pkgDims[2]) continue
+
+      selectedPackage = pkg
+      break
+    }
+
+    if (!selectedPackage) {
+      // No package fits — return a clear error, don't fabricate dimensions
+      return NextResponse.json({
+        success: false,
+        error: `This order cannot be packed into the available packaging options. ` +
+               `Items require at least ${Math.ceil(maxItemLength)}×${Math.ceil(maxItemWidth)}×${Math.ceil(maxItemHeight)} inches ` +
+               `with a total packed volume of ${Math.ceil(packedVolume)} cu.in. ` +
+               `Available packages: ${PACKAGES.map(p => `${p.name} (${p.length}×${p.width}×${p.height})`).join(', ')}. ` +
+               `Please contact support or split your order.`,
+        code: 'NO_FITTING_PACKAGE',
+        packedVolume: Math.ceil(packedVolume),
+        maxItemDimensions: { length: maxItemLength, width: maxItemWidth, height: maxItemHeight },
+        availablePackages: PACKAGES.map(p => ({ name: p.name, length: p.length, width: p.width, height: p.height })),
+      }, { status: 422 })
+    }
+
+    // Use the selected package's actual dimensions for EasyPost
+    const boxLength = selectedPackage.length
+    const boxWidth = selectedPackage.width
+    const boxHeight = selectedPackage.height
 
     const { shipmentId, rates } = await getRates(
       { street: address.street, city: address.city, state: address.state, zip: address.zip, country: address.country || 'US' },
       { weightOz: totalWeightOz, lengthIn: boxLength, widthIn: boxWidth, heightIn: boxHeight }
     )
-    return NextResponse.json({ success: true, shipmentId, rates, parcel: { weightOz: totalWeightOz, lengthIn: boxLength, widthIn: boxWidth, heightIn: boxHeight } })
+    return NextResponse.json({
+      success: true, shipmentId, rates,
+      parcel: {
+        weightOz: totalWeightOz,
+        lengthIn: boxLength, widthIn: boxWidth, heightIn: boxHeight,
+        package: selectedPackage.name,
+        packedVolume: Math.ceil(packedVolume),
+      },
+    })
   } catch (error: any) {
     if (error instanceof EasyPostConfigError) {
       return NextResponse.json({ success: false, error: 'Shipping not configured.', code: 'NOT_CONFIGURED' }, { status: 503 })

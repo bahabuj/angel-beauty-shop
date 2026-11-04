@@ -8,19 +8,38 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { motion } from 'framer-motion'
-import { Mail, Phone, MapPin, Clock, Send, MessageCircle } from 'lucide-react'
+import { Mail, Phone, MapPin, Clock, Send, MessageCircle, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
 export default function ContactPage() {
-  const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' })
+  const [form, setForm] = useState({ name: '', email: '', subject: '', message: '', website: '' })
   const [sent, setSent] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setSent(true)
-    toast.success('Message sent! We\'ll get back to you soon.')
-    setForm({ name: '', email: '', subject: '', message: '' })
+    if (submitting) return
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setSent(true)
+        toast.success('Message sent! We\'ll get back to you soon.')
+        setForm({ name: '', email: '', subject: '', message: '', website: '' })
+      } else {
+        toast.error(data.error || 'Failed to send message. Please try again.')
+      }
+    } catch {
+      toast.error('Something went wrong. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -81,13 +100,19 @@ export default function ContactPage() {
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-4">
+                  {/* Honeypot field — hidden from humans, bots fill it */}
+                  <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }} aria-hidden="true">
+                    <label>Website (leave empty)<input type="text" value={form.website} onChange={e => setForm(f => ({ ...f, website: e.target.value }))} tabIndex={-1} autoComplete="off" /></label>
+                  </div>
                   <div className="grid sm:grid-cols-2 gap-4">
                     <div><Label>Your Name</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="border-blush/30 mt-1" required /></div>
                     <div><Label>Email</Label><Input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} className="border-blush/30 mt-1" required /></div>
                   </div>
                   <div><Label>Subject</Label><Input value={form.subject} onChange={e => setForm(f => ({ ...f, subject: e.target.value }))} className="border-blush/30 mt-1" required /></div>
                   <div><Label>Message</Label><Textarea value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value }))} className="border-blush/30 mt-1 min-h-[120px]" required /></div>
-                  <Button type="submit" className="w-full bg-gold hover:bg-gold-light text-white beauty-btn">Send Message</Button>
+                  <Button type="submit" disabled={submitting} className="w-full bg-gold hover:bg-gold-light text-white beauty-btn">
+                    {submitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Sending...</> : 'Send Message'}
+                  </Button>
                 </form>
               )}
             </CardContent>

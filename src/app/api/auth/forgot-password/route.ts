@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { randomBytes } from 'crypto'
 import bcrypt from 'bcryptjs'
+import { sendPasswordReset, isEmailConfigured } from '@/lib/email'
 
 // ─── POST /api/auth/forgot-password ─────────────────────────────────────────
 //
@@ -65,31 +66,23 @@ export async function POST(request: NextRequest) {
     const resetUrl = `${siteUrl}/#auth?resetToken=${token}`
 
     // ── Email delivery ────────────────────────────────────────────────────
-    // TODO: Replace with real email service (Resend, SendGrid, Postmark, etc.)
-    // For now: log to console + return resetUrl in dev response
-    console.log('═══════════════════════════════════════════════════════════')
-    console.log('[Password Reset]')
-    console.log(`  To:      ${user.email}`)
-    console.log(`  Name:    ${user.name || '(no name)'}`)
-    console.log(`  Token:   ${token}`)
-    console.log(`  Expires: ${expiresAt.toISOString()}`)
-    console.log(`  URL:     ${resetUrl}`)
-    console.log('═══════════════════════════════════════════════════════════')
+    // Send the password reset email via Resend (or simulate in dev mode)
+    const emailResult = await sendPasswordReset({
+      customerEmail: user.email,
+      customerName: user.name || 'there',
+      resetUrl,
+    })
 
-    // In production, send an email like:
-    // await sendEmail({
-    //   to: user.email,
-    //   subject: 'Angels Beauty — Password Reset',
-    //   html: `<p>Hi ${user.name},</p>
-    //          <p>Click <a href="${resetUrl}">here</a> to reset your password.</p>
-    //          <p>This link expires in ${TOKEN_TTL_HOURS} hour(s).</p>`,
-    // })
+    if (!emailResult.success) {
+      console.error('[Forgot Password] Email send failed:', emailResult.error)
+    }
 
-    // Return resetUrl in dev mode (so the link can be tested without SMTP)
+    // In dev mode without email configured, still return the reset URL for testing
     const isDev = process.env.NODE_ENV !== 'production'
+    const includeResetUrl = isDev && !isEmailConfigured()
     return NextResponse.json({
       ...genericResponse,
-      ...(isDev ? { resetUrl, token } : {}),
+      ...(includeResetUrl ? { resetUrl, token } : {}),
     })
   } catch (error: any) {
     console.error('[Forgot Password] Error:', error?.message || error)

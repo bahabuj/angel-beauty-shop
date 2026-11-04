@@ -132,9 +132,14 @@ export default function BulkShippingEditor() {
 
   useEffect(() => { loadProducts() }, [loadProducts])
 
-  // ── Check if a product is complete ────────────────────────────────────────
+  // ── Check if a product is complete ──────────────────────────────────────
+  // For products WITH variants: complete if ALL variants are complete
+  // For products WITHOUT variants: complete if product-level fields are filled
   const isComplete = (p: BulkProduct): boolean => {
     if (p.editFreeShipping) return true
+    if (p.variants.length > 0) {
+      return p.variants.every(v => isVariantComplete(v))
+    }
     const w = parseFloat(p.editWeight)
     const l = parseFloat(p.editLength)
     const wd = parseFloat(p.editWidth)
@@ -289,17 +294,29 @@ export default function BulkShippingEditor() {
     }
   }
 
-  // ── Save all dirty products ──────────────────────────────────────────────
+  // ── Save all dirty products AND dirty variants ───────────────────────────
   const saveAll = async () => {
-    const dirty = products.filter((p) => p.dirty)
-    if (dirty.length === 0) {
+    // Collect dirty products (product-level fields changed)
+    const dirtyProducts = products.filter((p) => p.dirty)
+    // Collect dirty variants (variant-level fields changed)
+    const dirtyVariants: { product: BulkProduct; variant: BulkVariant }[] = []
+    for (const p of products) {
+      for (const v of p.variants) {
+        if (v.dirty) dirtyVariants.push({ product: p, variant: v })
+      }
+    }
+
+    const totalDirty = dirtyProducts.length + dirtyVariants.length
+    if (totalDirty === 0) {
       toast.info('No changes to save')
       return
     }
     setSaving(true)
     let success = 0
     let fail = 0
-    for (const p of dirty) {
+
+    // Save dirty products (product-level shipping fields)
+    for (const p of dirtyProducts) {
       try {
         const weight = p.editWeight.trim() ? parseFloat(p.editWeight) : null
         const length = p.editLength.trim() ? parseFloat(p.editLength) : null
@@ -312,18 +329,40 @@ export default function BulkShippingEditor() {
           body: JSON.stringify({ weight, length, width, height, freeShipping: p.editFreeShipping }),
         })
         const data = await res.json()
-        if (data.success) {
-          success++
-        } else {
-          fail++
-        }
-      } catch {
-        fail++
-      }
+        if (data.success) { success++ } else { fail++ }
+      } catch { fail++ }
     }
+
+    // Save dirty variants (variant-level shipping fields)
+    for (const { product, variant } of dirtyVariants) {
+      try {
+        const weightOz = variant.editWeightOz.trim() ? parseFloat(variant.editWeightOz) : null
+        const lengthIn = variant.editLengthIn.trim() ? parseFloat(variant.editLengthIn) : null
+        const widthIn = variant.editWidthIn.trim() ? parseFloat(variant.editWidthIn) : null
+        const heightIn = variant.editHeightIn.trim() ? parseFloat(variant.editHeightIn) : null
+
+        const res = await fetch(`/api/products/${product.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            variants: [{
+              id: variant.id,
+              name: variant.name,
+              price: variant.price,
+              stock: 0,
+              active: true,
+              weightOz, lengthIn, widthIn, heightIn,
+            }],
+          }),
+        })
+        const data = await res.json()
+        if (data.success) { success++ } else { fail++ }
+      } catch { fail++ }
+    }
+
     setSaving(false)
     if (fail === 0) {
-      toast.success(`${success} product(s) saved successfully`)
+      toast.success(`${success} item(s) saved successfully`)
       await loadProducts()
     } else {
       toast.error(`${success} saved, ${fail} failed. Please try again for the failed ones.`)
@@ -342,7 +381,8 @@ export default function BulkShippingEditor() {
 
   const incompleteCount = products.filter((p) => !isComplete(p)).length
   const completeCount = products.length - incompleteCount
-  const dirtyCount = products.filter((p) => p.dirty).length
+  // Count dirty products AND dirty variants
+  const dirtyCount = products.filter((p) => p.dirty || p.variants.some(v => v.dirty)).length
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (

@@ -200,7 +200,7 @@ export default function BulkShippingEditor() {
     setProducts((prev) => prev.map((p) => p.id === id ? { ...p, expanded: !p.expanded } : p))
   }
 
-  // ── Save a single variant ─────────────────────────────────────────────────
+  // ── Save a single variant (SAFE — doesn't touch other variants) ────────────
   const saveVariant = async (productId: string, v: BulkVariant) => {
     setSavingIds((prev) => new Set(prev).add(v.id))
     try {
@@ -209,20 +209,13 @@ export default function BulkShippingEditor() {
       const widthIn = v.editWidthIn.trim() ? parseFloat(v.editWidthIn) : null
       const heightIn = v.editHeightIn.trim() ? parseFloat(v.editHeightIn) : null
 
-      // Save via PUT /api/products/:id with variant data
-      const res = await fetch(`/api/products/${productId}`, {
+      // Use the SAFE variant shipping endpoint — updates ONLY shipping
+      // fields on this one variant. Does NOT call syncVariants() which
+      // would delete other variants not included in the request.
+      const res = await fetch(`/api/products/${productId}/variants/${v.id}/shipping`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          variants: [{
-            id: v.id,
-            name: v.name,
-            price: v.price,
-            stock: 0,
-            active: true,
-            weightOz, lengthIn, widthIn, heightIn,
-          }],
-        }),
+        body: JSON.stringify({ weightOz, lengthIn, widthIn, heightIn }),
       })
       const data = await res.json()
       if (data.success) {
@@ -341,19 +334,11 @@ export default function BulkShippingEditor() {
         const widthIn = variant.editWidthIn.trim() ? parseFloat(variant.editWidthIn) : null
         const heightIn = variant.editHeightIn.trim() ? parseFloat(variant.editHeightIn) : null
 
-        const res = await fetch(`/api/products/${product.id}`, {
+        // Use the SAFE variant shipping endpoint (not the destructive PUT)
+        const res = await fetch(`/api/products/${product.id}/variants/${variant.id}/shipping`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            variants: [{
-              id: variant.id,
-              name: variant.name,
-              price: variant.price,
-              stock: 0,
-              active: true,
-              weightOz, lengthIn, widthIn, heightIn,
-            }],
-          }),
+          body: JSON.stringify({ weightOz, lengthIn, widthIn, heightIn }),
         })
         const data = await res.json()
         if (data.success) { success++ } else { fail++ }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Fragment } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -478,8 +478,8 @@ export default function BulkShippingEditor() {
                     const hasVariants = p.variants.length > 0
                     const incompleteVariants = p.variants.filter(v => !isVariantComplete(v))
                     return (
-                      <>
-                      <tr key={p.id} className={`border-b border-blush/20 ${p.dirty ? 'bg-gold/5' : ''} ${hasVariants ? 'cursor-pointer' : ''}`} onClick={hasVariants ? () => toggleExpand(p.id) : undefined}>
+                      <Fragment key={p.id}>
+                      <tr className={`border-b border-blush/20 ${p.dirty ? 'bg-gold/5' : ''} ${hasVariants ? 'cursor-pointer' : ''}`} onClick={hasVariants ? () => toggleExpand(p.id) : undefined}>
                         <td className="px-3 py-2 font-medium max-w-[200px]">
                           <div className="flex items-center gap-1">
                             {hasVariants && (
@@ -567,7 +567,7 @@ export default function BulkShippingEditor() {
                         const vComplete = isVariantComplete(v)
                         const vSaving = savingIds.has(v.id)
                         return (
-                          <tr key={v.id} className="bg-blush/5 border-b border-blush/10">
+                          <tr key={`${p.id}-${v.id}`} className="bg-blush/5 border-b border-blush/10">
                             <td className="px-3 py-2 pl-10 text-sm text-muted-foreground">
                               ↳ {v.name} <span className="text-[10px] text-muted-foreground/70">(${v.price})</span>
                             </td>
@@ -629,7 +629,7 @@ export default function BulkShippingEditor() {
                           </tr>
                         )
                       })}
-                      </>
+                      </Fragment>
                     )
                   })}
                   {filtered.length === 0 && (

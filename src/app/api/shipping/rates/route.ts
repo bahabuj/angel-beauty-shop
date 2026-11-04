@@ -17,25 +17,105 @@ export async function POST(req: NextRequest) {
     const productIds = items.map((i: any) => i.id).filter(Boolean)
     const products = await db.product.findMany({
       where: { id: { in: productIds } },
-      select: { id: true, name: true, weight: true, length: true, width: true, height: true, freeShipping: true },
+      select: {
+        id: true, name: true, freeShipping: true,
+        weight: true, length: true, width: true, height: true,
+        variants: { select: { id: true, name: true, weightOz: true, lengthIn: true, widthIn: true, heightIn: true, active: true } },
+      },
     })
 
-    // Flag incomplete products
-    const incomplete = products.filter(p =>
-      p.weight == null || p.length == null || p.width == null || p.height == null ||
-      p.weight <= 0 || p.length <= 0 || p.width <= 0 || p.height <= 0
-    )
-    if (incomplete.length > 0) {
+    // ── Resolve shipping info per cart item (variant-specific or product fallback) ──
+    // For each cart item, look up the variant (if variantId is provided) and use
+    // its shipping fields. If the variant's fields are null, fall back to the
+    // parent product's fields. If both are null, the item is "incomplete".
+    interface ResolvedItem {
+      productId: string
+      variantId: string | null
+      name: string
+      qty: number
+      weightOz: number
+      lengthIn: number
+      widthIn: number
+      heightIn: number
+      freeShipping: boolean
+    }
+
+    const resolvedItems: ResolvedItem[] = []
+    const incompleteItems: string[] = []
+
+    for (const item of items) {
+      const product = products.find(p => p.id === item.id)
+      if (!product) {
+        incompleteItems.push(`Unknown product (${item.id})`)
+        continue
+      }
+      const qty = Math.max(1, item.quantity || 1)
+      const variantId = item.variantId || null
+      const variant = variantId ? product.variants.find(v => v.id === variantId) : null
+
+      // Determine shipping fields:
+      // - If a variant is selected: use ONLY variant fields (no fallback to product)
+      //   Per client requirement: "require complete shipping weight and dimensions
+      //   for the selected variant. Do not silently fall back to shared parent-product
+      //   measurements."
+      // - If no variant (product has no variants): use product-level fields
+      let weightOz: number | null = null
+      let lengthIn: number | null = null
+      let widthIn: number | null = null
+      let heightIn: number | null = null
+
+      if (variant) {
+        // Variant selected — use ONLY variant fields, no product fallback
+        weightOz = variant.weightOz
+        lengthIn = variant.lengthIn
+        widthIn = variant.widthIn
+        heightIn = variant.heightIn
+      } else if (product.variants.length === 0) {
+        // Product has NO variants — use product-level fields
+        weightOz = product.weight
+        lengthIn = product.length
+        widthIn = product.width
+        heightIn = product.height
+      } else {
+        // Product HAS variants but no variantId was sent — this shouldn't happen
+        // in normal checkout, but handle gracefully by flagging as incomplete
+        weightOz = null
+        lengthIn = null
+        widthIn = null
+        heightIn = null
+      }
+
+      // Check completeness
+      if (!product.freeShipping && (weightOz == null || weightOz <= 0 || lengthIn == null || lengthIn <= 0 || widthIn == null || widthIn <= 0 || heightIn == null || heightIn <= 0)) {
+        const variantLabel = variant ? ` (${variant.name})` : (product.variants.length > 0 ? ' (no variant selected)' : '')
+        incompleteItems.push(`"${product.name}${variantLabel}"`)
+        continue
+      }
+
+      resolvedItems.push({
+        productId: product.id,
+        variantId,
+        name: product.name + (variant ? ` (${variant.name})` : ''),
+        qty,
+        weightOz: weightOz || 0,
+        lengthIn: lengthIn || 0,
+        widthIn: widthIn || 0,
+        heightIn: heightIn || 0,
+        freeShipping: product.freeShipping,
+      })
+    }
+
+    if (incompleteItems.length > 0) {
       return NextResponse.json({
         success: false,
-        error: `Missing shipping weight/dimensions for: ${incomplete.map(p => `"${p.name}"`).join(', ')}. Please contact support.`,
+        error: `Missing shipping weight/dimensions for: ${incompleteItems.join(', ')}. Please contact support.`,
         code: 'INCOMPLETE_PRODUCTS',
-        incompleteProductNames: incomplete.map(p => p.name),
+        incompleteProductNames: incompleteItems,
       }, { status: 422 })
     }
 
     // All free shipping?
-    const allFree = items.every((item: any) => products.find(p => p.id === item.id)?.freeShipping === true)
+    const allFree = resolvedItems.every(item => item.freeShipping)
     if (allFree) {
       return NextResponse.json({
         success: true, shipmentId: null,
@@ -73,20 +153,17 @@ export async function POST(req: NextRequest) {
     // Track total item count (for quantity)
     let totalItemCount = 0
 
-    for (const item of items) {
-      const p = products.find(pr => pr.id === item.id)
-      if (!p) continue
-      const qty = Math.max(1, item.quantity || 1)
-      totalWeightOz += (p.weight || 0) * qty
-      totalItemCount += qty
+    for (const item of resolvedItems) {
+      totalWeightOz += item.weightOz * item.qty
+      totalItemCount += item.qty
 
-      const itemL = p.length || 0
-      const itemW = p.width || 0
-      const itemH = p.height || 0
+      const itemL = item.lengthIn
+      const itemW = item.widthIn
+      const itemH = item.heightIn
       const itemVol = itemL * itemW * itemH
 
       // Sum volumes × quantity
-      totalVolumeCubicIn += itemVol * qty
+      totalVolumeCubicIn += itemVol * item.qty
 
       // Box must accommodate the largest item on each axis
       maxItemLength = Math.max(maxItemLength, itemL)

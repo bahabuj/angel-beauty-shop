@@ -13,6 +13,11 @@ export interface VariantInput {
   weight?: string | null
   active: boolean
   order: number
+  // EasyPost shipping fields (per-variant)
+  weightOz?: number | null
+  lengthIn?: number | null
+  widthIn?: number | null
+  heightIn?: number | null
 }
 
 export interface VariantOutput {
@@ -67,6 +72,11 @@ export function normalizeVariants(raw: unknown): VariantInput[] {
         weight: v.weight ? String(v.weight).trim() || null : null,
         active: v.active !== false,
         order: typeof v.order === 'number' ? v.order : idx,
+        // Shipping fields (EasyPost per-variant)
+        weightOz: v.weightOz != null && v.weightOz !== '' ? parseFloat(String(v.weightOz)) || null : null,
+        lengthIn: v.lengthIn != null && v.lengthIn !== '' ? parseFloat(String(v.lengthIn)) || null : null,
+        widthIn: v.widthIn != null && v.widthIn !== '' ? parseFloat(String(v.widthIn)) || null : null,
+        heightIn: v.heightIn != null && v.heightIn !== '' ? parseFloat(String(v.heightIn)) || null : null,
       }
     })
     .filter((v): v is VariantInput => v !== null)
@@ -113,6 +123,10 @@ export async function syncVariants(
       weight: v.weight,
       active: v.active,
       order: i,
+      weightOz: v.weightOz ?? null,
+      lengthIn: v.lengthIn ?? null,
+      widthIn: v.widthIn ?? null,
+      heightIn: v.heightIn ?? null,
     }
     if (v.id && existingIds.has(v.id)) {
       await tx.productVariant.update({ where: { id: v.id }, data })

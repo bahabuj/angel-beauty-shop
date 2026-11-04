@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import Image from 'next/image'
 import { useNavStore } from '@/store/nav-store'
 import { useCartStore, useCartHydrated } from '@/store/cart-store'
@@ -149,7 +149,7 @@ export default function CheckoutPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          items: items.map((i) => ({ id: i.id, quantity: i.quantity })),
+          items: items.map((i) => ({ id: i.id, quantity: i.quantity, variantId: i.variantId || null })),
           address: {
             street: form.address,
             city: form.city,
@@ -164,12 +164,44 @@ export default function CheckoutPage() {
         setCarrierRates(data.rates || [])
         setEasypostShipmentId(data.shipmentId)
         if (data.rates?.length > 0) setSelectedRateId(data.rates[0].rateId)
+        // Store the cart+address signature so we can detect changes later
+        const cartSig = JSON.stringify(items.map(i => ({ id: i.id, qty: i.quantity, variantId: i.variantId })))
+        const addrSig = `${form.address}|${form.city}|${form.state}|${form.zipCode}|${selectedCountry}`
+        rateFetchSignature.current = `${cartSig}|${addrSig}`
       } else {
         setRateError(data.error || 'Could not calculate shipping rates.')
       }
     } catch { setRateError('Failed to fetch shipping rates. Please try again.') }
     finally { setFetchingRates(false) }
   }, [items, form.address, form.city, form.state, form.zipCode, selectedCountry])
+
+  // ─── Invalidate previous shipping quote when cart or address changes ──────
+  // If the user changes their cart (adds/removes items, changes quantity,
+  // selects a different variant) or edits their delivery address, the
+  // previously fetched EasyPost rates are no longer valid. Clear them
+  // so the customer must fetch new rates before proceeding.
+  useEffect(() => {
+    // Build a signature of the current cart + address
+    const cartSignature = JSON.stringify(
+      items.map(i => ({ id: i.id, qty: i.quantity, variantId: i.variantId }))
+    )
+    const addressSignature = `${form.address}|${form.city}|${form.state}|${form.zipCode}|${selectedCountry}`
+
+    // If we already have rates and the cart/address has changed, invalidate
+    if (carrierRates.length > 0 || selectedRateId || easypostShipmentId) {
+      // Only invalidate if the fetch was done for a different cart/address
+      // (we compare against the signature stored when rates were fetched)
+      if (rateFetchSignature.current !== `${cartSignature}|${addressSignature}`) {
+        setCarrierRates([])
+        setSelectedRateId(null)
+        setEasypostShipmentId(null)
+        setRateError(null)
+      }
+    }
+  }, [items, form.address, form.city, form.state, form.zipCode, selectedCountry])
+
+  // Ref to store the cart+address signature at the time rates were fetched
+  const rateFetchSignature = useRef<string>('')
 
   // ─── Determine shipping cost ─────────────────────────────────────────────
   let shipping = 0

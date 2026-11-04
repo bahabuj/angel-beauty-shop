@@ -83,6 +83,14 @@ model ProductVariant {
   weight       String?
   active       Boolean  @default(true)
   order        Int      @default(0)
+  // ─── Shipping (EasyPost) — per-variant measurements ──────────────────
+  // If null, falls back to the parent Product's shipping fields.
+  // If both variant and product are null, the item is "incomplete" and
+  // blocks checkout until the admin fills in the measurements.
+  weightOz     Float?
+  lengthIn     Float?
+  widthIn      Float?
+  heightIn     Float?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

@@ -6,68 +6,29 @@ import { getSiteUrl } from '@/lib/utils'
 import { getRateById, isEasyPostConfigured, EasyPostConfigError, EasyPostAPIError } from '@/lib/easypost'
 
 // ─── GET /api/orders ──────────────────────────────────────────────────────────
-// Returns orders sorted by creation date (newest first).
-//
-// Role-based filter:
-//   - admin (or no session — admin panel is now open without auth) → all orders
-//   - others → only orders whose userId matches the session user id OR whose
-//              email matches the session user email (used by the customer
-//              "My Account" page in account-page.tsx)
-
+// SECURITY FIX: Require authentication.
+//   - admin → all orders
+//   - authenticated customer → only their own orders
+//   - unauthenticated → 401
 export async function GET() {
   try {
     const session = await getServerSession(authOptions)
-
-    const isAdminContext = !session?.user || session.user.role === 'admin'
-
+    if (!session?.user) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    }
+    const isAdmin = session.user.role === 'admin'
     const orders = await db.order.findMany({
-      where: isAdminContext
-        ? undefined
-        : {
-            OR: [
-              { userId: session!.user.id },
-              { email: session!.user.email },
-            ],
-          },
+      where: isAdmin ? undefined : { OR: [{ userId: session.user.id }, { email: session.user.email }] },
       orderBy: { createdAt: 'desc' },
     })
     return NextResponse.json({ success: true, orders })
   } catch (error) {
     console.error('[Orders GET Error]', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch orders' },
-      { status: 500 }
-    )
+    return NextResponse.json({ success: false, error: 'Failed to fetch orders' }, { status: 500 })
   }
 }
 
-// ─── POST /api/orders ─────────────────────────────────────────────────────────
-//
-// Creates a new order with SERVER-SIDE price validation.
-//
-// The client submits items with prices, but the server overrides those prices
-// with the authoritative prices from the database. This prevents price
-// manipulation on the client side.
-//
-// Variant handling:
-//   - If an item has a `variantId`, the server looks up the ProductVariant and
-//     uses ITS price (not the product's denormalized price).
-//   - If an item has NO `variantId`, the server falls back to the Product's
-//     denormalized price (backward compatibility).
-//
-// Shipping rules (in priority order):
-//   1. If a promotion with freeShipping is applied → shipping = 0
-//   2. If any product has freeShipping flag → shipping = 0
-//   3. If the customer's country matches an active ShippingZone → use that zone's rate
-//   4. Otherwise fall back to: free over $100, $15 flat under $100
-//
-// Promotion rules:
-//   - Optional `couponCode` field is validated against the Promotion table
-//   - Discount is applied to subtotal (percentage or fixed)
-//   - freeShipping flag is honored
-//   - Eligibility (products, categories, min order, dates, usage limit) is checked
-// ─────────────────────────────────────────────────────────────────────────────
-
+// ─── POST /api/orders (unchanged — public for guest checkout) ────────────────
 interface OrderItem {
   id: string
   name: string
@@ -79,17 +40,14 @@ interface OrderItem {
   sku?: string | null
 }
 
-/** Map a customer country name to a shipping-zone code. */
 function matchShippingZoneCode(country: string): string | null {
   const c = (country || '').toLowerCase().trim()
   if (!c) return null
-  // Direct matches on common country names
   if (c.includes('united states') || c.includes('usa') || c.includes('u.s.') || c === 'us') return 'US'
   if (c.includes('canada') || c === 'ca') return 'CA'
   if (c.includes('mexico') || c === 'mx') return 'MX'
   if (c.includes('united kingdom') || c.includes('uk') || c.includes('ireland') || c.includes('britain') || c.includes('england') || c.includes('scotland') || c.includes('wales')) return 'UK'
   if (c.includes('australia') || c.includes('new zealand') || c === 'au' || c === 'nz') return 'AU'
-  // Region matches
   if (c.includes('europe') || c.includes('germany') || c.includes('france') || c.includes('spain') || c.includes('italy') || c.includes('netherlands') || c.includes('belgium') || c.includes('sweden') || c.includes('norway') || c.includes('denmark') || c.includes('finland') || c.includes('austria') || c.includes('switzerland') || c.includes('portugal') || c.includes('greece') || c.includes('poland')) return 'EU'
   if (c.includes('africa') || c.includes('nigeria') || c.includes('ghana') || c.includes('kenya') || c.includes('south africa') || c.includes('egypt') || c.includes('morocco') || c.includes('ethiopia') || c.includes('tanzania') || c.includes('uganda') || c.includes('cameroon') || c.includes('ivory coast') || c.includes('senegal') || c.includes('zimbabwe') || c.includes('zambia')) return 'AF'
   if (c.includes('asia') || c.includes('china') || c.includes('japan') || c.includes('korea') || c.includes('india') || c.includes('pakistan') || c.includes('bangladesh') || c.includes('indonesia') || c.includes('philippines') || c.includes('vietnam') || c.includes('thailand') || c.includes('malaysia') || c.includes('singapore') || c.includes('hong kong') || c.includes('taiwan') || c.includes('sri lanka') || c.includes('nepal')) return 'AS'
@@ -109,112 +67,51 @@ function generateInvoiceNumber(): string {
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json()
-
-    // ─── 1. Validate required fields ─────────────────────────────────────
     if (!data.customerName || !data.email || !data.address || !data.city) {
-      return NextResponse.json(
-        { success: false, error: 'Missing required customer information' },
-        { status: 400 }
-      )
+      return NextResponse.json({ success: false, error: 'Missing required customer information' }, { status: 400 })
     }
-
     if (!data.items) {
-      return NextResponse.json(
-        { success: false, error: 'Order items are required' },
-        { status: 400 }
-      )
+      return NextResponse.json({ success: false, error: 'Order items are required' }, { status: 400 })
     }
 
-    // ─── 2. Parse items and validate ─────────────────────────────────────
     let items: OrderItem[]
-    if (typeof data.items === 'string') {
-      try {
-        items = JSON.parse(data.items)
-      } catch {
-        return NextResponse.json(
-          { success: false, error: 'Invalid items format' },
-          { status: 400 }
-        )
-      }
-    } else {
-      items = data.items
-    }
+    if (typeof data.items === 'string') { try { items = JSON.parse(data.items) } catch { return NextResponse.json({ success: false, error: 'Invalid items format' }, { status: 400 }) } }
+    else { items = data.items }
+    if (!Array.isArray(items) || items.length === 0) { return NextResponse.json({ success: false, error: 'At least one item is required' }, { status: 400 }) }
 
-    if (!Array.isArray(items) || items.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'At least one item is required' },
-        { status: 400 }
-      )
-    }
-
-    // ─── 3. Server-side price validation (variant-aware) ─────────────────
     const productIds = items.map((item: OrderItem) => item.id).filter(Boolean)
-
-    const products = await db.product.findMany({
-      where: { id: { in: productIds } },
-      include: { variants: true },
-    })
-
+    const products = await db.product.findMany({ where: { id: { in: productIds } }, include: { variants: true } })
     const productMap = new Map(products.map((p) => [p.id, p]))
 
     const validatedItems = items.map((item: OrderItem) => {
       const product = productMap.get(item.id)
-
       if (product) {
         let authoritativePrice = product.price
         let variantName: string | null = null
         let sku: string | null = item.sku ?? null
-
         if (item.variantId) {
           const variant = product.variants.find((v) => v.id === item.variantId)
-          if (variant) {
-            authoritativePrice = variant.price
-            variantName = variant.name
-            sku = variant.sku ?? null
-          } else {
-            console.warn(
-              `[Orders] Variant ${item.variantId} not found for product ${item.id} — falling back to product price`
-            )
-          }
+          if (variant) { authoritativePrice = variant.price; variantName = variant.name; sku = variant.sku ?? null }
         } else if (product.variants.length > 0) {
           const active = product.variants.filter((v) => v.active)
           const pool = active.length > 0 ? active : product.variants
           const cheapest = pool.reduce((min, v) => (v.price < min.price ? v : min), pool[0])
-          authoritativePrice = cheapest.price
-          variantName = cheapest.name
-          sku = cheapest.sku ?? null
+          authoritativePrice = cheapest.price; variantName = cheapest.name; sku = cheapest.sku ?? null
         }
-
-        return {
-          ...item,
-          name: product.name,
-          price: authoritativePrice,
-          image: item.image || (product.images ? JSON.parse(product.images)[0] : undefined),
-          variantId: item.variantId ?? null,
-          variantName,
-          sku,
-          categorySlug: product.categorySlug,
-        }
+        return { ...item, name: product.name, price: authoritativePrice, image: item.image || (product.images ? JSON.parse(product.images)[0] : undefined), variantId: item.variantId ?? null, variantName, sku, categorySlug: product.categorySlug }
       }
+      // SECURITY FIX: Reject unknown products instead of trusting client prices
+      return null as unknown as OrderItem
+    }).filter((item: OrderItem) => item !== null && item.id !== undefined)
 
-      console.warn(
-        `[Orders] Product ${item.id} not found in DB — using client-submitted price: $${item.price}`
-      )
-      return {
-        ...item,
-        variantId: item.variantId ?? null,
-        variantName: item.variantName ?? null,
-        sku: item.sku ?? null,
-      }
-    })
+    // SECURITY FIX: Reject orders with unknown product IDs
+    if (validatedItems.length < items.length) {
+      const rejectedIds = items.filter(item => !productMap.has(item.id)).map(item => item.id)
+      return NextResponse.json({ success: false, error: `Order contains invalid product IDs: ${rejectedIds.join(', ')}` }, { status: 400 })
+    }
 
-    // ─── 4. Recalculate subtotal from validated prices ───────────────────
-    const subtotal = validatedItems.reduce(
-      (sum: number, item: OrderItem) => sum + item.price * item.quantity,
-      0
-    )
+    const subtotal = validatedItems.reduce((sum: number, item: OrderItem) => sum + item.price * item.quantity, 0)
 
-    // ─── 5. Validate coupon code (if provided) ───────────────────────────
     let discount = 0
     let freeShippingFromPromo = false
     let promotionId: string | null = null
@@ -223,65 +120,35 @@ export async function POST(req: NextRequest) {
     if (data.couponCode && typeof data.couponCode === 'string') {
       const code = data.couponCode.trim().toUpperCase()
       const promotion = await db.promotion.findUnique({ where: { couponCode: code } })
-
       if (promotion) {
-        // Re-validate all rules server-side (don't trust the client)
         const now = new Date()
-        const isValid =
-          promotion.status === 'active' &&
-          (!promotion.startDate || now >= promotion.startDate) &&
-          (!promotion.endDate || now <= promotion.endDate) &&
-          (promotion.usageLimit === 0 || promotion.usedCount < promotion.usageLimit) &&
-          (promotion.minimumOrder === 0 || subtotal >= promotion.minimumOrder)
-
-        // Eligibility check (products / categories)
+        const isValid = promotion.status === 'active' && (!promotion.startDate || now >= promotion.startDate) && (!promotion.endDate || now <= promotion.endDate) && (promotion.usageLimit === 0 || promotion.usedCount < promotion.usageLimit) && (promotion.minimumOrder === 0 || subtotal >= promotion.minimumOrder)
         if (isValid) {
-          const eligibleProductIds: string[] = (() => {
-            try { return JSON.parse(promotion.eligibleProducts || '[]') } catch { return [] }
-          })()
-          const eligibleCategorySlugs: string[] = (() => {
-            try { return JSON.parse(promotion.eligibleCategories || '[]') } catch { return [] }
-          })()
-
+          const eligibleProductIds: string[] = (() => { try { return JSON.parse(promotion.eligibleProducts || '[]') } catch { return [] } })()
+          const eligibleCategorySlugs: string[] = (() => { try { return JSON.parse(promotion.eligibleCategories || '[]') } catch { return [] } })()
           if (eligibleProductIds.length > 0 || eligibleCategorySlugs.length > 0) {
-            const matches = validatedItems.some((item: any) => {
-              const productMatch = eligibleProductIds.length > 0 && eligibleProductIds.includes(item.id)
-              const categoryMatch = eligibleCategorySlugs.length > 0 && item.categorySlug && eligibleCategorySlugs.includes(item.categorySlug)
-              return productMatch || categoryMatch
-            })
-            if (!matches) {
-              console.warn(`[Orders] Coupon ${code} not eligible for cart contents`)
-            }
-          } else {
-            // No eligibility restrictions → applies to all
+            const matches = validatedItems.some((item: any) => { const productMatch = eligibleProductIds.length > 0 && eligibleProductIds.includes(item.id); const categoryMatch = eligibleCategorySlugs.length > 0 && item.categorySlug && eligibleCategorySlugs.includes(item.categorySlug); return productMatch || categoryMatch })
+            if (!matches) { console.warn(`[Orders] Coupon ${code} not eligible for cart contents`) }
           }
-
           if (isValid) {
-            // Compute discount
-            if (promotion.type === 'percentage') {
-              discount = (subtotal * promotion.discount) / 100
-            } else if (promotion.type === 'fixed') {
-              discount = Math.min(promotion.discount, subtotal)
-            }
+            if (promotion.type === 'percentage') { discount = (subtotal * promotion.discount) / 100 }
+            else if (promotion.type === 'fixed') { discount = Math.min(promotion.discount, subtotal) }
             freeShippingFromPromo = promotion.freeShipping || promotion.type === 'shipping'
-            promotionId = promotion.id
-            couponCode = promotion.couponCode
+            promotionId = promotion.id; couponCode = promotion.couponCode
           }
-        } else {
-          console.warn(`[Orders] Coupon ${code} failed server-side validation`)
         }
       }
     }
 
     const discountedSubtotal = Math.max(0, subtotal - discount)
 
-    // ─── 6. Calculate shipping — EasyPost real-time rates (no flat-rate fallback) ──
-    const hasFreeShippingProduct = items.every((item: OrderItem) => {
+    // SECURITY FIX: Fixed vacuous-truth free shipping bug
+    const hasFreeShippingProduct = items.length > 0 && items.every((item: OrderItem) => {
       const product = productMap.get(item.id)
-      return product?.freeShipping === true
+      return product !== undefined && product.freeShipping === true
     })
-    const country = data.country || 'United States'
 
+    const country = data.country || 'United States'
     let shipping = 0
     let shippingZoneCode: string | null = null
     let easypostShipmentId: string | null = null
@@ -292,151 +159,51 @@ export async function POST(req: NextRequest) {
     if (freeShippingFromPromo || hasFreeShippingProduct) {
       shipping = 0
     } else {
-      // ── Real-time carrier rate required ──────────────────────────────────
       if (!isEasyPostConfigured()) {
-        console.error('[Orders] Rejected: EasyPost not configured, no fallback to flat rates')
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'Shipping calculation is not available right now. Please try again later or contact support.',
-            code: 'SHIPPING_NOT_CONFIGURED',
-          },
-          { status: 503 }
-        )
+        return NextResponse.json({ success: false, error: 'Shipping calculation is not available right now.', code: 'SHIPPING_NOT_CONFIGURED' }, { status: 503 })
       }
-
       const shipmentId = data.easypostShipmentId
       const rateId = data.easypostRateId
-
       if (!shipmentId || !rateId) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'Please select a shipping option before placing your order.',
-            code: 'NO_SHIPPING_RATE_SELECTED',
-          },
-          { status: 400 }
-        )
+        return NextResponse.json({ success: false, error: 'Please select a shipping option before placing your order.', code: 'NO_SHIPPING_RATE_SELECTED' }, { status: 400 })
       }
-
-      // Server-side re-validation: fetch the rate from EasyPost by ID
       let verifiedRate
-      try {
-        verifiedRate = await getRateById(shipmentId, rateId)
-      } catch (err: any) {
-        if (err instanceof EasyPostConfigError) {
-          return NextResponse.json(
-            { success: false, error: 'Shipping calculation is not configured.', code: 'SHIPPING_NOT_CONFIGURED' },
-            { status: 503 }
-          )
-        }
-        if (err instanceof EasyPostAPIError) {
-          console.error('[Orders] EasyPost API error:', err.message)
-          return NextResponse.json(
-            { success: false, error: 'Could not verify the selected shipping rate. Please refresh and try again.', code: 'RATE_VERIFICATION_FAILED' },
-            { status: 502 }
-          )
-        }
-        console.error('[Orders] Unexpected error:', err?.message || err)
-        return NextResponse.json(
-          { success: false, error: 'Could not verify the selected shipping rate. Please try again.', code: 'RATE_VERIFICATION_FAILED' },
-          { status: 500 }
-        )
+      try { verifiedRate = await getRateById(shipmentId, rateId) }
+      catch (err: any) {
+        if (err instanceof EasyPostConfigError) { return NextResponse.json({ success: false, error: 'Shipping calculation is not configured.', code: 'SHIPPING_NOT_CONFIGURED' }, { status: 503 }) }
+        if (err instanceof EasyPostAPIError) { return NextResponse.json({ success: false, error: 'Could not verify the selected shipping rate.', code: 'RATE_VERIFICATION_FAILED' }, { status: 502 }) }
+        return NextResponse.json({ success: false, error: 'Could not verify the selected shipping rate.', code: 'RATE_VERIFICATION_FAILED' }, { status: 500 })
       }
-
-      if (!verifiedRate) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'The selected shipping rate is no longer available. Please refresh and choose a shipping option again.',
-            code: 'RATE_NOT_FOUND',
-          },
-          { status: 400 }
-        )
-      }
-
-      shipping = verifiedRate.rate
-      easypostShipmentId = verifiedRate.shipmentId
-      easypostRateId = verifiedRate.rateId
-      selectedCarrier = verifiedRate.carrier
-      selectedService = verifiedRate.service
-      shippingZoneCode = null
+      if (!verifiedRate) { return NextResponse.json({ success: false, error: 'The selected shipping rate is no longer available.', code: 'RATE_NOT_FOUND' }, { status: 400 }) }
+      shipping = verifiedRate.rate; easypostShipmentId = verifiedRate.shipmentId; easypostRateId = verifiedRate.rateId; selectedCarrier = verifiedRate.carrier; selectedService = verifiedRate.service; shippingZoneCode = null
     }
 
     const total = discountedSubtotal + shipping
-
-    // ─── 7. Generate invoice number and create order ─────────────────────
     const invoiceNumber = generateInvoiceNumber()
 
     const order = await db.order.create({
       data: {
-        customerName: data.customerName,
-        email: data.email,
-        phone: data.phone || null,
-        address: data.address,
-        city: data.city,
-        state: data.state || null,
-        zipCode: data.zipCode || null,
-        country,
-        paymentMethod: data.paymentMethod || 'clover',
-        userId: data.userId || null,
-        items: JSON.stringify(validatedItems),
-        subtotal,
-        discount,
-        shippingRate: shipping,
-        shippingZoneCode,
-        promotionId,
-        couponCode,
-        easypostShipmentId,
-        easypostRateId,
-        selectedCarrier,
-        selectedService,
-        total,
-        // Always force pending — client cannot override these
-        paymentStatus: 'pending',
-        status: 'pending',
-        invoiceNumber,
+        customerName: data.customerName, email: data.email, phone: data.phone || null,
+        address: data.address, city: data.city, state: data.state || null, zipCode: data.zipCode || null,
+        country, paymentMethod: data.paymentMethod || 'clover', userId: data.userId || null,
+        items: JSON.stringify(validatedItems), subtotal, discount, shippingRate: shipping,
+        shippingZoneCode, promotionId, couponCode, easypostShipmentId, easypostRateId, selectedCarrier, selectedService,
+        total, paymentStatus: 'pending', status: 'pending', invoiceNumber,
       },
     })
 
-    // ─── 8. Increment promotion usage count (if a coupon was used) ───────
     if (promotionId) {
-      try {
-        await db.promotion.update({
-          where: { id: promotionId },
-          data: { usedCount: { increment: 1 } },
-        })
-      } catch (e) {
-        console.warn(`[Orders] Failed to increment usage count for promotion ${promotionId}:`, e)
-      }
+      try { await db.promotion.update({ where: { id: promotionId }, data: { usedCount: { increment: 1 } } }) } catch (e) { console.warn(`[Orders] Failed to increment usage count for promotion ${promotionId}:`, e) }
     }
 
-    if (process.env.CLOVER_DEBUG === 'true') {
-      console.log(
-        `[Orders] Created order ${order.id} — subtotal: $${subtotal.toFixed(2)}, discount: $${discount.toFixed(2)}, shipping: $${shipping.toFixed(2)} (${shippingZoneCode || 'default'}), total: $${total.toFixed(2)}`
-      )
-    }
-
-    // ─── 9. Trigger invoice generation in background ─────────────────────
     try {
       const siteUrl = getSiteUrl()
-      fetch(`${siteUrl}/api/invoice/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId: order.id, sendEmail: false }),
-      }).catch(() => {
-        // Non-blocking — don't fail the order if invoice generation fails
-      })
-    } catch {
-      // Non-blocking
-    }
+      fetch(`${siteUrl}/api/invoice/generate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderId: order.id, sendEmail: false }) }).catch(() => {})
+    } catch {}
 
     return NextResponse.json({ success: true, order })
   } catch (error) {
     console.error('[Orders POST Error]', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to create order' },
-      { status: 500 }
-    )
+    return NextResponse.json({ success: false, error: 'Failed to create order' }, { status: 500 })
   }
 }
